@@ -11,11 +11,11 @@ The code based on the [Reference implementation of SLIP-0039](https://github.com
  This SLIP39 implementation uses a 3 level height (l=3) of a 16 degree (d=16) tree (T), which is represented as an array of the level two nodes (groups, G).
 
  The degree (d) and the level (l) of the tree are 16 and 3 respectively,
- which means that max d^(l-1), i.e. 16^2, nodes (N) can be in a complete tree (or forest).
+ which means that max d^(l-1), i.e. 16^2, leaf nodes (M) can be in a complete tree (or forest).
 
  The first level (l=1) node of the tree is the the root (R), the level 2 ones are the `SSS` groups (Gs or group nodes) e.g. `[G0, ..., Gd]`.
  
- The last, the third, level nodes are the only leafs (group members) which contains the generated mnemonics.
+ The last, the third, level nodes are the only leafs (M, group members) which contains the generated mnemonics.
  
  Every node has two values:
   - the N and 
@@ -41,7 +41,7 @@ dependencies:
 ## Example
 
   ``` dart
-  import 'package/slip39/slip39dart';
+  import 'package:slip39/slip39dart';
 
   int main() {
   // threshold (N) number of group shares required to reconstruct the master secret.
