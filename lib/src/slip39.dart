@@ -2,15 +2,14 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:hex/hex.dart';
 import 'package:pointycastle/api.dart';
-import 'package:pointycastle/src/utils.dart';
 import 'package:pointycastle/digests/sha256.dart';
-//import 'package:pointycastle/random/fortuna_random.dart';
 import 'package:pointycastle/key_derivators/api.dart' show Pbkdf2Parameters;
 import 'package:pointycastle/key_derivators/pbkdf2.dart';
 import 'package:pointycastle/macs/hmac.dart';
-//import 'package:quiver/iterables.dart';
-import 'package:hex/hex.dart';
+//import 'package:pointycastle/random/fortuna_random.dart';
+import 'package:pointycastle/src/utils.dart';
 
 part 'slip39_helpers.dart';
 

@@ -70,7 +70,6 @@ final Random _random = Random.secure();
 List<int> _randomBytes([int length = 32]) {
   //FIXME: use the following only for testing.
   // return List<int>.generate(length, (_) => 0x12);
-
   return List<int>.generate(length, (i) => _random.nextInt(256));
 }
 
@@ -157,10 +156,7 @@ List _splitSecret(int threshold, int shareCount, Uint8List sharedSecret) {
     shares.add(rr);
   }
 
-  //shares.forEach((k,v) {
-  //  print(v);
-  //});
-  return shares; //result.values.toList();
+  return shares;
 }
 
 ///
@@ -222,7 +218,7 @@ List<int> _interpolate(Map shares, int x) {
     var logBasisEval = (logProd - _logTable[k ^ x] - sum) % 255;
 
     var idx = 0;
-    //for (var pair in zip([v as List, results])) {
+
     for (var item in v as List) {
       var shareVal = item;
       var intermediateSum = results[idx];
@@ -271,12 +267,9 @@ List<int> _rs1024CreateChecksum(data) {
       _saltString.codeUnits + data + List<int>.filled(_checksumWordsLength, 0);
 
   int polymod = _rs1024Polymod(values) ^ 1;
-
-  var result = [
-    for (var i = _checksumWordsLength - 1; i >= 0; i--)
-      (polymod >> 10 * i) & 1023
-  ];
-  return result;
+  var result =
+      List.generate(_checksumWordsLength, (i) => (polymod >> 10 * i) & 1023);
+  return result.reversed.toList();
 }
 
 bool _rs1024VerifyChecksum(data) {
@@ -298,11 +291,9 @@ _intFromIndices(List indices) {
 ///
 List<int> _intToIndices(BigInt value, length, bits) {
   var mask = BigInt.from((1 << bits) - 1);
-  var result = [
-    for (var i = length - 1; i >= 0; i--)
-      (((value >> (i * bits)) & mask)).toInt()
-  ];
-  return result;
+  var result =
+      List.generate(length, (i) => (((value >> (i * bits)) & mask)).toInt());
+  return result.reversed.toList();
 }
 
 String _mnemomicFromIndices(List indices) {
@@ -356,7 +347,7 @@ Uint8List _recoverSecret(threshold, shares) {
 ///     :rtype: Array of bytes.
 
 String _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
-  if (mnemonics == null || mnemonics?.isEmpty) {
+  if (mnemonics == null || mnemonics.isEmpty) {
     throw Exception("The list of mnemonics is empty.");
   }
 
@@ -502,7 +493,6 @@ _decodeMnemonic(mnemonic) {
         'Invalid mnemonic: ${mnemonic}.\n Group threshold  ($groupThreshold) cannot be greater than group count ($groupCount).');
   }
 
-  var valueByteCount = _bitsToBytes(_radixBits * valueData.length - paddingLen);
   var valueInt = _intFromIndices(valueData);
 
   try {
