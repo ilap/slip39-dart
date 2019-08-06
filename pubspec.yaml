@@ -1,6 +1,6 @@
 name: slip39
 description:  Dart implementation of the SLIP39.
-version: 0.1.1
+version: 0.1.2
 author: Pal Dorogi "ilap"<pal.dorogi@gmail.com>
 homepage: https://github.com/ilap/slip39-dart
 
@@ -10,4 +10,4 @@ dependencies:
   test: ^1.5.0
 
 environment:
-  sdk: '>=2.0.0 <=3.0.0'
+  sdk: '>=2.0.0 <3.0.0'
