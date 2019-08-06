@@ -282,7 +282,10 @@ bool _rs1024VerifyChecksum(data) {
 _intFromIndices(List indices) {
   var value = BigInt.from(0);
   var radix = BigInt.from(pow(2, _radixBits));
-  for (var index in indices) value = value * radix + BigInt.from(index);
+  for (var index in indices) {
+    value = value * radix + BigInt.from(index);
+  }
+
   return value;
 }
 

@@ -52,7 +52,6 @@ class Slip39 {
       int iterationExponent = 0,
       int threshold,
       List<List<int>> groups}) {
-    
     final identifier = _generateIdentifier();
 
     final slip = Slip39._(
@@ -60,7 +59,8 @@ class Slip39 {
         identifier: identifier,
         groupCount: groups.length,
         groupThreshold: threshold);
-    final ems = _crypt(masterSecret.codeUnits, passphrase, iterationExponent, slip.identifier);
+    final ems = _crypt(
+        masterSecret.codeUnits, passphrase, iterationExponent, slip.identifier);
 
     final root = slip._buildRecursive(
       Slip39Node(),
@@ -105,7 +105,7 @@ class Slip39 {
   }
 
   static String recoverSecret(List<String> mnemonics, String passphrase) {
-      return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
+    return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
   }
 
   Slip39Node fromPath(String path) {
@@ -119,7 +119,8 @@ class Slip39 {
 
     return children.fold(root, (Slip39Node prev, int childNumber) {
       if (childNumber >= prev._children.length) {
-        throw ArgumentError("The path index ($childNumber) exceeds the children index (${prev._children.length - 1}).");
+        throw ArgumentError(
+            "The path index ($childNumber) exceeds the children index (${prev._children.length - 1}).");
       }
 
       return prev._children[childNumber];
@@ -130,7 +131,7 @@ class Slip39 {
     final source =
         r"(^" + _keyPrefix + r")(\/\d{1,2}){0," + _maxDepth.toString() + r"}$";
     final regex = new RegExp(source);
-    
+
     if (!regex.hasMatch(path)) {
       throw ArgumentError("Expected valid path e.g. \"${_keyPrefix}/0/0\".");
     }
