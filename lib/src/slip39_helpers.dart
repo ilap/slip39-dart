@@ -69,8 +69,8 @@ final Random _random = Random.secure();
 ///
 List<int> _randomBytes([int length = 32]) {
   //FIXME: use the following only for testing.
-  // return List<int>.generate(length, (_) => 0x12);
-  return List<int>.generate(length, (i) => _random.nextInt(256));
+  return List<int>.generate(length, (_) => 0x12);
+  //return List<int>.generate(length, (i) => _random.nextInt(256));
 }
 
 ///
@@ -151,8 +151,10 @@ List _splitSecret(int threshold, int shareCount, Uint8List sharedSecret) {
   base_shares[_digestIndex] = digest + random_part;
   base_shares[_secretIndex] = sharedSecret;
 
+  print("SHARE: $random_share_count ${shares.toString()}");
   for (var i = random_share_count; i < shareCount; i++) {
     var rr = _interpolate(base_shares, i);
+    print("Share: $i  $rr");
     shares.add(rr);
   }
 
@@ -256,7 +258,10 @@ int _rs1024Polymod(values) {
     var b = chk >> 20;
     chk = (chk & 0xFFFFF) << 10 ^ v;
     for (var i = 0; i < 10; i++) {
-      chk ^= ((b >> i) & 1) != 0 ? _gen[i] : 0;
+      var bb = ((b >> i) & 1);
+      var cc = bb != 0 ? _gen[i] : 0;
+
+      chk ^= cc;
     }
   }
   return chk;
@@ -269,10 +274,12 @@ List<int> _rs1024CreateChecksum(data) {
   int polymod = _rs1024Polymod(values) ^ 1;
   var result =
       List.generate(_checksumWordsLength, (i) => (polymod >> 10 * i) & 1023);
+        print("VALUES: ${polymod} ... $result ... ");
   return result.reversed.toList();
 }
 
 bool _rs1024VerifyChecksum(data) {
+  print("CCCCC: ${_saltString.codeUnits} ${data}");
   return _rs1024Polymod(_saltString.codeUnits + data) == 1;
 }
 
