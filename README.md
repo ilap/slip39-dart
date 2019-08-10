@@ -6,6 +6,10 @@ The dart implementation of the [SLIP39](https://github.com/satoshilabs/slips/blo
 
 The code based on the [Reference implementation of SLIP-0039](https://github.com/trezor/python-shamir-mnemonic/).
 
+# DISCLAIMER
+
+This project is still in early development phase. Use it at your own risk.
+
 ## Description
 
  This SLIP39 implementation uses a 3 level height (l=3) of a 16 degree (d=16) tree (T), which is represented as an array of the level two nodes (groups, G).
