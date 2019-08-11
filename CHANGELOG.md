@@ -12,3 +12,6 @@ v0.1.3
 
 v0.1.4
 * Added unittests, fixed minor issues, cleaned code
+
+v0.1.5-dev.1
+* Changed versioning format.

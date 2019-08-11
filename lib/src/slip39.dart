@@ -46,12 +46,14 @@ class Slip39 {
     );
   }
 
-  factory Slip39.fromArray({
-      List<int> masterSecret = const [],
+  factory Slip39.fromArray(
+      {List<int> masterSecret = const [],
       String passphrase = '',
       int iterationExponent = 0,
       int threshold = 1,
-      List<List<int>> groups = const [[1, 1]]}) {
+      List<List<int>> groups = const [
+        [1, 1]
+      ]}) {
     if (masterSecret.length * 8 < _minEntropyBits) {
       throw Exception(
           'The length of the master secret (${masterSecret.length} bytes) must be at least ${_bitsToBytes(_minEntropyBits)} bytes.');

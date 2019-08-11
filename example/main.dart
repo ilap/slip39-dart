@@ -36,9 +36,10 @@ void main() {
   print("Shares used for restoring the master secret:");
   allShares..forEach((s) => print(s));
 
-  final recoveredSecret = String.fromCharCodes(Slip39.recoverSecret(allShares, passphrase: passphrase));
+  final recoveredSecret = String.fromCharCodes(
+      Slip39.recoverSecret(allShares, passphrase: passphrase));
   print('\nMaster secret: $masterSecret');
   print("Recovered one: $recoveredSecret");
   assert(masterSecret == recoveredSecret);
-;
+  ;
 }

@@ -94,8 +94,9 @@ Uint8List _roundFunction(
 Uint8List _crypt(List master_secret, String passphrase, int iterationExponent,
     Uint8List identifier,
     {bool encrypt = true}) {
-        if (iterationExponent < 0 || iterationExponent > _maxIterationExponent) {
-    throw Exception('Invalid iteration exponent (${iterationExponent}). Expected between 0 and ${_maxIterationExponent}');
+  if (iterationExponent < 0 || iterationExponent > _maxIterationExponent) {
+    throw Exception(
+        'Invalid iteration exponent (${iterationExponent}). Expected between 0 and ${_maxIterationExponent}');
   }
   var IL =
       Uint8List.fromList(master_secret.sublist(0, master_secret.length ~/ 2));
@@ -128,15 +129,18 @@ Uint8List _createDigest(Uint8List randomData, Uint8List sharedSecret) {
 
 List _splitSecret(int threshold, int shareCount, Uint8List sharedSecret) {
   if (threshold <= 0) {
-    throw Exception('The requested threshold (${threshold}) must be a positive integer.');
+    throw Exception(
+        'The requested threshold (${threshold}) must be a positive integer.');
   }
 
   if (threshold > shareCount) {
-    throw Exception('The requested threshold (${threshold}) must not exceed the number of shares (${shareCount}).');
+    throw Exception(
+        'The requested threshold (${threshold}) must not exceed the number of shares (${shareCount}).');
   }
 
   if (shareCount > _maxShareCount) {
-    throw Exception('The requested number of shares (${shareCount}) must not exceed ${_maxShareCount}.');
+    throw Exception(
+        'The requested number of shares (${shareCount}) must not exceed ${_maxShareCount}.');
   }
   //  If the threshold is 1, then the digest of the shared secret is not used.
   if (threshold == 1) {
@@ -149,8 +153,8 @@ List _splitSecret(int threshold, int shareCount, Uint8List sharedSecret) {
   final digest = _createDigest(Uint8List.fromList(random_part), sharedSecret);
 
   final sharesIdx = List.generate(randomShareCount, (i) => i);
-  final shares = List.generate(
-      randomShareCount, (_) => _randomBytes(sharedSecret.length));
+  final shares =
+      List.generate(randomShareCount, (_) => _randomBytes(sharedSecret.length));
 
   final base_shares = Map.fromIterables(sharesIdx, shares);
   base_shares[_digestIndex] = digest + random_part;
@@ -179,7 +183,8 @@ Uint8List _generateIdentifier() {
 
 Uint8List _xor(Uint8List a, Uint8List b) {
   if (a.length != b.length) {
-    throw  Exception('Invalid padding in mnemonic or insufficient length of mnemonics (${a.length} or ${b.length})');
+    throw Exception(
+        'Invalid padding in mnemonic or insufficient length of mnemonics (${a.length} or ${b.length})');
   }
   return Uint8List.fromList(List.generate(a.length, (i) => a[i] ^ b[i]));
 }
@@ -360,7 +365,7 @@ List<int> _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
     throw Exception("The list of mnemonics is empty.");
   }
 
- final decoded = _decodeMnemonics(mnemonics);
+  final decoded = _decodeMnemonics(mnemonics);
   final identifier = decoded['identifiers'];
   final iterationExponent = decoded['iterationExponents'];
   final groupThreshold = decoded['groupThresholds'];
@@ -398,7 +403,8 @@ List<int> _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
   });
 
   final ems = _recoverSecret(groupThreshold, allShares);
-  final id = Uint8List.fromList(_intToIndices(BigInt.from(identifier), _identifierExpWordsLength, 8));
+  final id = Uint8List.fromList(
+      _intToIndices(BigInt.from(identifier), _identifierExpWordsLength, 8));
   final ms = _crypt(ems, passphrase, iterationExponent, id, encrypt: false);
   return ms;
 }
@@ -454,7 +460,7 @@ _decodeMnemonics(mnemonics) {
     'groupThresholds': groupThresholds.first,
     'groupCounts': groupCounts.first,
     'groups': groups,
-   } ;
+  };
 }
 
 ///
@@ -480,7 +486,8 @@ _decodeMnemonic(mnemonic) {
   final idExpInt =
       _intFromIndices(data.sublist(0, _identifierExpWordsLength)).toInt();
   final identifier = idExpInt >> _iterationExponentBitsLength;
-  final iterationExponent = idExpInt & ((1 << _iterationExponentBitsLength) - 1);
+  final iterationExponent =
+      idExpInt & ((1 << _iterationExponentBitsLength) - 1);
   final tmp = _intFromIndices(
       data.sublist(_identifierExpWordsLength, _identifierExpWordsLength + 2));
 
@@ -503,13 +510,14 @@ _decodeMnemonic(mnemonic) {
   final valueInt = _intFromIndices(valueData);
 
   try {
-    final valueByteCount = _bitsToBytes(_radixBits * valueData.length - paddingLen);
+    final valueByteCount =
+        _bitsToBytes(_radixBits * valueData.length - paddingLen);
     final share = encodeBigInt(valueInt);
 
     // Add zero paddings
     var shareLength = share.length;
 
-    while(shareLength++ < valueByteCount) {
+    while (shareLength++ < valueByteCount) {
       print("INZERTEDDDD: $share");
       share.insert(0, 0x0);
     }

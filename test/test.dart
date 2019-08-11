@@ -1,10 +1,7 @@
 import 'dart:io';
-import 'package:collection/collection.dart';
-import 'package:test/test.dart';
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:convert' show utf8;
+
+import 'package:test/test.dart';
 import 'package:hex/hex.dart';
 
 import '../lib/slip39.dart';
@@ -183,10 +180,12 @@ main() {
 
       test(description, () {
         if (ms.length != 0) {
-          List<int> result = Slip39.recoverSecret(mnemonics, passphrase: passphrase);
+          List<int> result =
+              Slip39.recoverSecret(mnemonics, passphrase: passphrase);
           assert(ms == HEX.encode(result));
         } else {
-          expect(() => Slip39.recoverSecret(mnemonics, passphrase: passphrase), throwsException);
+          expect(() => Slip39.recoverSecret(mnemonics, passphrase: passphrase),
+              throwsException);
         }
       });
     });
