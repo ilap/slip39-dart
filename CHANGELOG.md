@@ -9,3 +9,6 @@ v0.1.2
 
 v0.1.3
 * Updated formatting
+
+v0.1.4
+* Added unittests, fixed minor issues, cleaned code

@@ -19,7 +19,7 @@ void main() {
   ];
 
   final slip = Slip39.fromArray(
-      masterSecret: masterSecret,
+      masterSecret: masterSecret.codeUnits,
       passphrase: passphrase,
       threshold: threshold,
       groups: groups);
@@ -36,7 +36,9 @@ void main() {
   print("Shares used for restoring the master secret:");
   allShares..forEach((s) => print(s));
 
-  final recoveredSecret = Slip39.recoverSecret(allShares, passphrase);
-  print("Recovered secret: $recoveredSecret");
+  final recoveredSecret = String.fromCharCodes(Slip39.recoverSecret(allShares, passphrase: passphrase));
+  print('\nMaster secret: $masterSecret');
+  print("Recovered one: $recoveredSecret");
   assert(masterSecret == recoveredSecret);
+;
 }

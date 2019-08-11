@@ -90,8 +90,8 @@ dependencies:
 ```
 ## TODOS
 
-- [ ] Add unit tests.
-- [ ] Test with the reference code's test vectors.
+- [x] Add unit tests.
+- [x] Test with the reference code's test vectors.
 - [ ] Refactor the helpers to different helper classes e.g. `CryptoHelper()`, `ShamirHelper()` etc.
 - [ ] Add `JSON` representation, see [JSON representation](#json-representation) below.
 - [ ] Refactor to much simpler code.

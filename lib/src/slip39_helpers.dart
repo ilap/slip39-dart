@@ -17,6 +17,8 @@ const _iterationExponentBitsLength = 5;
 const _identifierExpWordsLength =
     (_identifierBitsLength + _iterationExponentBitsLength + _radixBits - 1) ~/
         _radixBits;
+// The maximum iteration exponent
+final _maxIterationExponent = pow(2, _iterationExponentBitsLength);
 
 // The maximum number of shares that can be created.
 const _maxShareCount = 16;
@@ -69,19 +71,19 @@ final Random _random = Random.secure();
 ///
 List<int> _randomBytes([int length = 32]) {
   //FIXME: use the following only for testing.
-  return List<int>.generate(length, (_) => 0x12);
-  //return List<int>.generate(length, (i) => _random.nextInt(256));
+  //return List<int>.generate(length, (_) => 0x12);
+  return List<int>.generate(length, (_) => _random.nextInt(256));
 }
 
 ///
 /// The round function used internally by the Feistel cipher.
 ///
 Uint8List _roundFunction(
-    i, Uint8List passphrase, e, Uint8List salt, Uint8List r) {
+    i, Uint8List passphrase, int exp, Uint8List salt, Uint8List r) {
   final saltAndR = Uint8List.fromList(salt + r);
   final List<int> round = [i];
   final roundedPhrase = Uint8List.fromList(round + passphrase);
-  final count = (_iterationCount << e) ~/ _roundCount;
+  final count = (_iterationCount << exp) ~/ _roundCount;
 
   _derivator..init(Pbkdf2Parameters(saltAndR, count, r.length));
   final result = _derivator.process(roundedPhrase);
@@ -89,23 +91,26 @@ Uint8List _roundFunction(
   return result;
 }
 
-Uint8List _crypt(List master_secret, String passphrase, int iteration_exponent,
+Uint8List _crypt(List master_secret, String passphrase, int iterationExponent,
     Uint8List identifier,
     {bool encrypt = true}) {
+        if (iterationExponent < 0 || iterationExponent > _maxIterationExponent) {
+    throw Exception('Invalid iteration exponent (${iterationExponent}). Expected between 0 and ${_maxIterationExponent}');
+  }
   var IL =
       Uint8List.fromList(master_secret.sublist(0, master_secret.length ~/ 2));
   var IR = Uint8List.fromList(master_secret.sublist(master_secret.length ~/ 2));
 
-  var pwd = Uint8List.fromList(passphrase.codeUnits);
+  final pwd = Uint8List.fromList(passphrase.codeUnits);
 
-  var salt = _getSalt(identifier);
+  final salt = _getSalt(identifier);
 
   var range = List.generate(_roundCount, (i) => i);
   range = encrypt ? range : range.reversed.toList();
 
-  for (var i in range) {
-    var f = _roundFunction(i, pwd, iteration_exponent, salt, IR);
-    var t = _xor(IL, f);
+  for (final i in range) {
+    final f = _roundFunction(i, pwd, iterationExponent, salt, IR);
+    final t = _xor(IL, f);
     IL = IR;
     IR = t;
   }
@@ -116,45 +121,43 @@ Uint8List _createDigest(Uint8List randomData, Uint8List sharedSecret) {
   final mac = new Mac("SHA-256/HMAC");
   final keyParam = new KeyParameter(randomData);
   mac.init(keyParam);
-  var result = mac.process(sharedSecret);
+  final result = mac.process(sharedSecret);
 
   return Uint8List.fromList(result.sublist(0, 4));
 }
 
 List _splitSecret(int threshold, int shareCount, Uint8List sharedSecret) {
-  // "The requested threshold ({}) must be a positive integer.".format(threshold)
-  assert(threshold >= 1);
+  if (threshold <= 0) {
+    throw Exception('The requested threshold (${threshold}) must be a positive integer.');
+  }
 
-  //  "The requested threshold ({}) must not exceed the number of shares ({}).".format(
-  //              threshold, share_count
-  assert(threshold <= shareCount);
+  if (threshold > shareCount) {
+    throw Exception('The requested threshold (${threshold}) must not exceed the number of shares (${shareCount}).');
+  }
 
-  //  "The requested number of shares ({}) must not exceed {}.".format(
-  //              share_count, MAX_SHARE_COUNT
-  assert(shareCount <= _maxShareCount);
-
+  if (shareCount > _maxShareCount) {
+    throw Exception('The requested number of shares (${shareCount}) must not exceed ${_maxShareCount}.');
+  }
   //  If the threshold is 1, then the digest of the shared secret is not used.
   if (threshold == 1) {
     return List.generate(shareCount, (_) => sharedSecret);
   }
 
-  final random_share_count = threshold - 2;
+  final randomShareCount = threshold - 2;
 
-  var random_part = _randomBytes(sharedSecret.length - _digestLength);
+  final random_part = _randomBytes(sharedSecret.length - _digestLength);
   final digest = _createDigest(Uint8List.fromList(random_part), sharedSecret);
 
-  var sharesIdx = List.generate(random_share_count, (i) => i);
-  var shares = List.generate(
-      random_share_count, (_) => _randomBytes(sharedSecret.length));
+  final sharesIdx = List.generate(randomShareCount, (i) => i);
+  final shares = List.generate(
+      randomShareCount, (_) => _randomBytes(sharedSecret.length));
 
   final base_shares = Map.fromIterables(sharesIdx, shares);
   base_shares[_digestIndex] = digest + random_part;
   base_shares[_secretIndex] = sharedSecret;
 
-  print("SHARE: $random_share_count ${shares.toString()}");
-  for (var i = random_share_count; i < shareCount; i++) {
-    var rr = _interpolate(base_shares, i);
-    print("Share: $i  $rr");
+  for (var i = randomShareCount; i < shareCount; i++) {
+    final rr = _interpolate(base_shares, i);
     shares.add(rr);
   }
 
@@ -175,7 +178,9 @@ Uint8List _generateIdentifier() {
 }
 
 Uint8List _xor(Uint8List a, Uint8List b) {
-  assert(a.length == b.length);
+  if (a.length != b.length) {
+    throw  Exception('Invalid padding in mnemonic or insufficient length of mnemonics (${a.length} or ${b.length})');
+  }
   return Uint8List.fromList(List.generate(a.length, (i) => a[i] ^ b[i]));
 }
 
@@ -217,18 +222,20 @@ List<int> _interpolate(Map shares, int x) {
       sum = sum + _logTable[k ^ kk];
     });
 
-    var logBasisEval = (logProd - _logTable[k ^ x] - sum) % 255;
-
+    final logBasisEval = (logProd - _logTable[k ^ x] - sum) % 255;
+    if (logBasisEval < 0) {
+      throw 'Wrong implementation of the modulo function in dart!';
+    }
     var idx = 0;
 
-    for (var item in v as List) {
-      var shareVal = item;
-      var intermediateSum = results[idx];
-      var r = shareVal != 0
+    for (final item in v as List) {
+      final shareVal = item;
+      final intermediateSum = results[idx];
+      final r = shareVal != 0
           ? _expTable[(_logTable[shareVal] + logBasisEval) % 255]
           : 0;
 
-      var res = intermediateSum ^ r;
+      final res = intermediateSum ^ r;
 
       results[idx] = res;
       idx += 1;
@@ -254,12 +261,12 @@ int _rs1024Polymod(values) {
 
   var chk = 1;
 
-  for (var v in values) {
-    var b = chk >> 20;
+  for (final v in values) {
+    final b = chk >> 20;
     chk = (chk & 0xFFFFF) << 10 ^ v;
     for (var i = 0; i < 10; i++) {
-      var bb = ((b >> i) & 1);
-      var cc = bb != 0 ? _gen[i] : 0;
+      final bb = ((b >> i) & 1);
+      final cc = bb != 0 ? _gen[i] : 0;
 
       chk ^= cc;
     }
@@ -268,18 +275,16 @@ int _rs1024Polymod(values) {
 }
 
 List<int> _rs1024CreateChecksum(data) {
-  var values =
+  final values =
       _saltString.codeUnits + data + List<int>.filled(_checksumWordsLength, 0);
 
   int polymod = _rs1024Polymod(values) ^ 1;
-  var result =
+  final result =
       List.generate(_checksumWordsLength, (i) => (polymod >> 10 * i) & 1023);
-        print("VALUES: ${polymod} ... $result ... ");
   return result.reversed.toList();
 }
 
 bool _rs1024VerifyChecksum(data) {
-  print("CCCCC: ${_saltString.codeUnits} ${data}");
   return _rs1024Polymod(_saltString.codeUnits + data) == 1;
 }
 
@@ -288,8 +293,8 @@ bool _rs1024VerifyChecksum(data) {
 ///
 _intFromIndices(List indices) {
   var value = BigInt.from(0);
-  var radix = BigInt.from(pow(2, _radixBits));
-  for (var index in indices) {
+  final radix = BigInt.from(pow(2, _radixBits));
+  for (final index in indices) {
     value = value * radix + BigInt.from(index);
   }
 
@@ -300,25 +305,25 @@ _intFromIndices(List indices) {
 /// Converts a Big integer value to indices in big endian order.
 ///
 List<int> _intToIndices(BigInt value, length, bits) {
-  var mask = BigInt.from((1 << bits) - 1);
-  var result =
+  final mask = BigInt.from((1 << bits) - 1);
+  final result =
       List.generate(length, (i) => (((value >> (i * bits)) & mask)).toInt());
   return result.reversed.toList();
 }
 
 String _mnemomicFromIndices(List indices) {
-  var result = indices.fold("", (prev, index) {
-    var separator = prev == "" ? "" : " ";
+  final result = indices.fold("", (prev, index) {
+    final separator = prev == "" ? "" : " ";
     return prev + separator + _wordList[index];
   });
   return result;
 }
 
 List<int> _mnemonicToIndices(String mnemonic) {
-  var words = mnemonic.toLowerCase().split(" ");
+  final words = mnemonic.toLowerCase().split(" ");
   try {
-    var result = words.fold(<int>[], (prev, item) {
-      var index = _wordListMap[item];
+    final result = words.fold(<int>[], (prev, item) {
+      final index = _wordListMap[item];
       return prev..add(index);
     });
     return result;
@@ -333,12 +338,12 @@ Uint8List _recoverSecret(threshold, shares) {
     return shares.values.first; //next(iter(shares))[1]
   }
 
-  var sharedSecret = _interpolate(shares, _secretIndex);
-  var digestShare = _interpolate(shares, _digestIndex);
-  var digest = digestShare.sublist(0, _digestLength);
-  var randomPart = digestShare.sublist(_digestLength);
+  final sharedSecret = _interpolate(shares, _secretIndex);
+  final digestShare = _interpolate(shares, _digestIndex);
+  final digest = digestShare.sublist(0, _digestLength);
+  final randomPart = digestShare.sublist(_digestLength);
 
-  var recoveredDigest = _createDigest(
+  final recoveredDigest = _createDigest(
       Uint8List.fromList(randomPart), Uint8List.fromList(sharedSecret));
   if (!_listsAreEqual(digest, recoveredDigest)) {
     throw Exception("Invalid digest of the shared secret.");
@@ -349,24 +354,18 @@ Uint8List _recoverSecret(threshold, shares) {
 ///
 /// Combines mnemonic shares to obtain the master secret which was previously
 /// split using Shamir's secret sharing scheme.
-///     :param mnemonics: List of mnemonics.
-///     :type mnemonics: List of byte arrays.
-///     :param passphrase: The passphrase used to encrypt the master secret.
-///     :type passphrase: Array of bytes.
-///     :return: The master secret.
-///     :rtype: Array of bytes.
-
-String _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
+//
+List<int> _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
   if (mnemonics == null || mnemonics.isEmpty) {
     throw Exception("The list of mnemonics is empty.");
   }
 
-  var data = _decodeMnemonics(mnemonics);
-  var identifier = data[0];
-  var iterationExponent = data[1];
-  var groupThreshold = data[2];
-  var groupCount = data[3];
-  var groups = data[4];
+ final decoded = _decodeMnemonics(mnemonics);
+  final identifier = decoded['identifiers'];
+  final iterationExponent = decoded['iterationExponents'];
+  final groupThreshold = decoded['groupThresholds'];
+  final groupCount = decoded['groupCounts'];
+  final groups = decoded['groups'];
 
   if (groups.length < groupThreshold) {
     throw Exception(
@@ -378,12 +377,12 @@ String _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
         "Wrong number of mnemonic groups. Expected $groupThreshold groups, but ${groups.length} were provided.");
   }
 
-  var allShares = {};
+  final allShares = {};
   groups.forEach((groupIndex, members) {
-    var threshold = members.keys.first;
-    var shares = members.values.first;
+    final threshold = members.keys.first;
+    final shares = members.values.first;
     if (shares.length != threshold) {
-      var prefix = _groupPrefix(
+      final prefix = _groupPrefix(
         identifier,
         iterationExponent,
         groupIndex,
@@ -394,39 +393,37 @@ String _combineMnemonics({List<String> mnemonics, String passphrase = ""}) {
           'Wrong number of mnemonics. Expected ${groupIndex} mnemonics starting with ${_mnemomicFromIndices(prefix)}, \n but ${members.length} were provided.');
     }
 
-    var recovered = _recoverSecret(threshold, shares);
+    final recovered = _recoverSecret(threshold, shares);
     allShares[groupIndex] = recovered;
   });
 
-  //var groupShares = groups.foreach();
-  var ems = _recoverSecret(groupThreshold, allShares);
-  var id = _intToIndices(BigInt.from(identifier), _identifierExpWordsLength, 8);
-  id = Uint8List.fromList(id);
-  var ms = _crypt(ems, passphrase, iterationExponent, id, encrypt: false);
-  return String.fromCharCodes(ms);
+  final ems = _recoverSecret(groupThreshold, allShares);
+  final id = Uint8List.fromList(_intToIndices(BigInt.from(identifier), _identifierExpWordsLength, 8));
+  final ms = _crypt(ems, passphrase, iterationExponent, id, encrypt: false);
+  return ms;
 }
 
 _decodeMnemonics(mnemonics) {
-  var identifiers = Set();
-  var iterationExponents = Set();
-  var groupThresholds = Set();
-  var groupCounts = Set();
-  var groups = {};
+  final identifiers = Set();
+  final iterationExponents = Set();
+  final groupThresholds = Set();
+  final groupCounts = Set();
+  final groups = {};
 
   mnemonics.forEach((mnemonic) {
-    var data = _decodeMnemonic(mnemonic);
+    final decoded = _decodeMnemonic(mnemonic);
 
-    identifiers.add(data[0]);
-    iterationExponents.add(data[1]);
-    var groupIndex = data[2];
-    groupThresholds.add(data[3]);
-    groupCounts.add(data[4]);
-    var memberIndex = data[5];
-    var memberThreshold = data[6];
-    var share = data[7];
+    identifiers.add(decoded['identifier']);
+    iterationExponents.add(decoded['iterationExponent']);
+    final groupIndex = decoded['groupIndex'];
+    groupThresholds.add(decoded['groupThreshold']);
+    groupCounts.add(decoded['groupCount']);
+    final memberIndex = decoded['memberIndex'];
+    final memberThreshold = decoded['memberThreshold'];
+    final share = decoded['share'];
 
-    var group = groups[groupIndex] ?? Map();
-    var member = group[memberThreshold] ?? Map();
+    final group = groups[groupIndex] ?? Map();
+    final member = group[memberThreshold] ?? Map();
     member[memberIndex] = share;
     group[memberThreshold] = member;
     if (group.keys.length != 1) {
@@ -451,27 +448,27 @@ _decodeMnemonics(mnemonics) {
         "Invalid set of mnemonics. All mnemonics must have the same group count.");
   }
 
-  return [
-    identifiers.first,
-    iterationExponents.first,
-    groupThresholds.first,
-    groupCounts.first,
-    groups,
-  ];
+  return {
+    'identifiers': identifiers.first,
+    'iterationExponents': iterationExponents.first,
+    'groupThresholds': groupThresholds.first,
+    'groupCounts': groupCounts.first,
+    'groups': groups,
+   } ;
 }
 
 ///
 /// Converts a share mnemonic to share data.
 ///
 _decodeMnemonic(mnemonic) {
-  var data = _mnemonicToIndices(mnemonic);
+  final data = _mnemonicToIndices(mnemonic);
 
-  if (mnemonic.length < _minMnemonicWordsLength) {
+  if (data.length < _minMnemonicWordsLength) {
     throw Exception(
         "Invalid mnemonic length. The length of each mnemonic must be at least $_minMnemonicWordsLength words.");
   }
 
-  var paddingLen = (_radixBits * (data.length - _metadataWordsLength)) % 16;
+  final paddingLen = (_radixBits * (data.length - _metadataWordsLength)) % 16;
   if (paddingLen > 8) {
     throw Exception("Invalid mnemonic length.");
   }
@@ -480,22 +477,22 @@ _decodeMnemonic(mnemonic) {
     throw Exception("Invalid mnemonic checksum");
   }
 
-  var idExpInt =
+  final idExpInt =
       _intFromIndices(data.sublist(0, _identifierExpWordsLength)).toInt();
-  var identifier = idExpInt >> _iterationExponentBitsLength;
-  var iterationExponent = idExpInt & ((1 << _iterationExponentBitsLength) - 1);
-  var tmp = _intFromIndices(
+  final identifier = idExpInt >> _iterationExponentBitsLength;
+  final iterationExponent = idExpInt & ((1 << _iterationExponentBitsLength) - 1);
+  final tmp = _intFromIndices(
       data.sublist(_identifierExpWordsLength, _identifierExpWordsLength + 2));
 
-  var indices = _intToIndices(tmp, 5, 4);
+  final indices = _intToIndices(tmp, 5, 4);
 
-  var groupIndex = indices[0];
-  var groupThreshold = indices[1];
-  var groupCount = indices[2];
-  var memberIndex = indices[3];
-  var memberThreshold = indices[4];
+  final groupIndex = indices[0];
+  final groupThreshold = indices[1];
+  final groupCount = indices[2];
+  final memberIndex = indices[3];
+  final memberThreshold = indices[4];
 
-  var valueData = data.sublist(
+  final valueData = data.sublist(
       _identifierExpWordsLength + 2, data.length - _checksumWordsLength);
 
   if (groupCount < groupThreshold) {
@@ -503,34 +500,43 @@ _decodeMnemonic(mnemonic) {
         'Invalid mnemonic: ${mnemonic}.\n Group threshold  ($groupThreshold) cannot be greater than group count ($groupCount).');
   }
 
-  var valueInt = _intFromIndices(valueData);
+  final valueInt = _intFromIndices(valueData);
 
   try {
-    var value = encodeBigInt(valueInt);
+    final valueByteCount = _bitsToBytes(_radixBits * valueData.length - paddingLen);
+    final share = encodeBigInt(valueInt);
 
-    return [
-      identifier,
-      iterationExponent,
-      groupIndex,
-      groupThreshold + 1,
-      groupCount + 1,
-      memberIndex,
-      memberThreshold + 1,
-      value,
-    ];
+    // Add zero paddings
+    var shareLength = share.length;
+
+    while(shareLength++ < valueByteCount) {
+      print("INZERTEDDDD: $share");
+      share.insert(0, 0x0);
+    }
+
+    return {
+      'identifier': identifier,
+      'iterationExponent': iterationExponent,
+      'groupIndex': groupIndex,
+      'groupThreshold': groupThreshold + 1,
+      'groupCount': groupCount + 1,
+      'memberIndex': memberIndex,
+      'memberThreshold': memberThreshold + 1,
+      'share': share,
+    };
   } on Exception catch (e) {
     throw Exception('Invalid mnemonic padding ($e}');
   }
 }
 
 List<int> _groupPrefix(
-    identifier, iteration_exponent, groupIndex, groupThreshold, groupCount) {
-  var id_exp_int = BigInt.from(
-      (identifier << _iterationExponentBitsLength) + iteration_exponent);
+    identifier, iterationExponent, groupIndex, groupThreshold, groupCount) {
+  final id_exp_int = BigInt.from(
+      (identifier << _iterationExponentBitsLength) + iterationExponent);
 
-  var indc = _intToIndices(id_exp_int, _identifierExpWordsLength, _radixBits);
+  final indc = _intToIndices(id_exp_int, _identifierExpWordsLength, _radixBits);
 
-  var indc2 =
+  final indc2 =
       (groupIndex << 6) + ((groupThreshold - 1) << 2) + ((groupCount - 1) >> 2);
 
   return <int>[]
@@ -554,7 +560,7 @@ bool _listsAreEqual(List a, List b) {
 ///
 String _encodeMnemonic(
   identifier,
-  iteration_exponent,
+  iterationExponent,
   groupIndex,
   groupThreshold,
   groupCount,
@@ -568,31 +574,31 @@ String _encodeMnemonic(
   BigInt valueInt = decodeBigInt(value);
   identifier = int.parse(HEX.encode(identifier), radix: 16);
 
-  var gp = _groupPrefix(
-      identifier, iteration_exponent, groupIndex, groupThreshold, groupCount);
-  var tp = //tuple(
+  final gp = _groupPrefix(
+      identifier, iterationExponent, groupIndex, groupThreshold, groupCount);
+  final tp = //tuple(
       _intToIndices(valueInt, value_word_count, _radixBits);
 
-  var calc = (((groupCount - 1) & 3) << 8) +
+  final calc = (((groupCount - 1) & 3) << 8) +
       (memberIndex << 4) +
       (memberThreshold - 1);
 
-  var shareData = <int>[]
+  final shareData = <int>[]
     ..addAll(gp)
     ..add(calc)
     ..addAll(tp);
-  var checksum = _rs1024CreateChecksum(shareData);
+  final checksum = _rs1024CreateChecksum(shareData);
 
   return _mnemomicFromIndices(shareData + checksum);
 }
 
 /// The precomputed exponent and log tables.
 /// ```
-///     var exp = List<int>.filled(255, 0);
-///     var log = List<int>.filled(256, 0);
-///     var poly = 1;
+///     final exp = List<int>.filled(255, 0);
+///     final log = List<int>.filled(256, 0);
+///     final poly = 1;
 ///
-///     for (var i = 0; i < exp.length; i++) {
+///     for (final i = 0; i < exp.length; i++) {
 ///       exp[i] = poly;
 ///       log[poly] = i;
 ///       // Multiply poly by the polynomial x + 1.

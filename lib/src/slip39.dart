@@ -46,12 +46,41 @@ class Slip39 {
     );
   }
 
-  factory Slip39.fromArray(
-      {String masterSecret,
-      String passphrase,
+  factory Slip39.fromArray({
+      List<int> masterSecret = const [],
+      String passphrase = '',
       int iterationExponent = 0,
-      int threshold,
-      List<List<int>> groups}) {
+      int threshold = 1,
+      List<List<int>> groups = const [[1, 1]]}) {
+    if (masterSecret.length * 8 < _minEntropyBits) {
+      throw Exception(
+          'The length of the master secret (${masterSecret.length} bytes) must be at least ${_bitsToBytes(_minEntropyBits)} bytes.');
+    }
+
+    if (masterSecret.length % 2 != 0) {
+      throw Exception(
+          'The length of the master secret in bytes must be an even number.');
+    }
+
+    final hasMatch = RegExp(r'^[\x20-\x7E]*$').hasMatch(passphrase);
+    if (!hasMatch) {
+      throw Exception(
+          'The passphrase must contain only printable ASCII characters (code points 32-126).');
+    }
+
+    if (threshold > groups.length) {
+      throw Exception(
+          'The requested group threshold (${threshold}) must not exceed the number of groups (${groups.length}).');
+    }
+
+    groups.forEach((item) => {
+          if (item[0] == 1 && item[1] > 1)
+            {
+              throw Exception(
+                  'Creating multiple member shares with member threshold 1 is not allowed. Use 1-of-1 member sharing instead. ${groups}')
+            }
+        });
+
     final identifier = _generateIdentifier();
 
     final slip = Slip39._(
@@ -59,8 +88,8 @@ class Slip39 {
         identifier: identifier,
         groupCount: groups.length,
         groupThreshold: threshold);
-    final ems = _crypt(
-        masterSecret.codeUnits, passphrase, iterationExponent, slip.identifier);
+    final ems =
+        _crypt(masterSecret, passphrase, iterationExponent, slip.identifier);
 
     final root = slip._buildRecursive(
       Slip39Node(),
@@ -83,7 +112,7 @@ class Slip39 {
 
     final secretShares = _splitSecret(threshold, nodes.length, secret);
     var idx = 0;
-    var children = <Slip39Node>[];
+    final children = <Slip39Node>[];
     nodes.forEach((item) {
       // n=threshold
       final n = item[0];
@@ -104,7 +133,8 @@ class Slip39 {
     return current.copyWith(children: List.unmodifiable(children));
   }
 
-  static String recoverSecret(List<String> mnemonics, String passphrase) {
+  static List<int> recoverSecret(List<String> mnemonics,
+      {String passphrase = ''}) {
     return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
   }
 
