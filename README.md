@@ -29,7 +29,11 @@ This project is still in early development phase. Use it at your own risk.
 
 ## Format
 
-The tree's human friendly array representation only uses the group (l=2) nodes as arrays.
+There are two formats for representing the shares:
+  - The JSON format, see details [here](#json-representation)
+  - and a simplye array/List format.
+  
+The The tree's human friendly array representation only uses the group (l=2) nodes as arrays.
 For example. : ``` [[1,1], [1,1], [3,5], [2,6]]```
 The group's first parameter is the `N` (group threshold) while the second is the `M`, the number of members in the group. See, details in [Example](#Example).
 
@@ -39,7 +43,7 @@ Add the following into the `pubspec.yaml`:
 
 ```
 dependencies:
-  slip39: ^0.1.3
+  slip39: ^0.1.5
 ```
 
 ## Example
@@ -93,56 +97,96 @@ dependencies:
 - [x] Add unit tests.
 - [x] Test with the reference code's test vectors.
 - [ ] Refactor the helpers to different helper classes e.g. `CryptoHelper()`, `ShamirHelper()` etc.
-- [ ] Add `JSON` representation, see [JSON representation](#json-representation) below.
+- [x] Add `JSON` representation, see [JSON representation](#json-representation) below.
 - [ ] Refactor to much simpler code.
 
 ### JSON Representation 
 
-``` json
-  {
-  "name": "Slip39",
+See in an example code from `eample/example.dart` below:
+``` dart
+import 'dart:convert';
+
+import 'package:slip39/slip39.dart';
+
+main() {
+  String masterSecret = "ABCDEFGHIJKLMNOP";
+  String passphrase = "TREZOR";
+
+  //
+  // RFC 4627 compliant JSON
+  //
+  final jsonString = '''
+{
+  "name": "Alice's shares",
   "threshold": 2,
-  "shares": [
+  "shares" : [
     {
-      "name": "My Primary",
+      "name": "Primary",
       "threshold": 1,
-      "shares": [
-        "Primary"
-      ]
+      "shares": ["Primary share"]
     },
     {
-      "name": "My Secondary",
+      "name": "Secondary",
       "threshold": 1,
-      "shares": [
-        "Secondary"
-      ]
+      "shares": ["Secondary share"]
     },
     {
       "name": "Friends",
       "threshold": 3,
-      "shares": [
-        "Alice",
-        "Bob",
-        "Charlie",
-        "David",
-        "Erin"
-      ]
+      "shares": ["Albert", "Ben", "Carol", "David", "Edward", "Fred"]
     },
     {
       "name": "Family",
       "threshold": 2,
-      "shares": [
-        "Adam",
-        "Brenda",
-        "Carol",
-        "Dan",
-        "Edward",
-        "Frank"
-      ]
+      "shares": ["Adam", "Brenda", "Cecil", "Donald", "Elissa"]
     }
   ]
 }
+''';
+
+  final json = jsonDecode(jsonString);
+
+  final slip = Slip39.from(
+    json,
+    masterSecret: masterSecret.codeUnits,
+    passphrase: passphrase,
+  );
+
+  final masterNode = slip.fromPath('r');
+
+  final jsonText = jsonEncode(masterNode);
+  assert(jsonEncode(json) == jsonText);
+
+  final familyNode = masterNode.derive(3);
+  final familyNode2 = masterNode.deriveByName('Family');
+  assert(familyNode == familyNode2);
+
+  // Recover from: 3 of 5 firend's shares and 2 of 6 of family shares
+  // three Friend's shares
+  final friendsShares = masterNode.deriveByName('Friends').mnemonics
+    ..shuffle()
+    ..sublist(0, 3);
+  final allShares = friendsShares
+    ..addAll(familyNode.mnemonics
+      ..shuffle()
+      ..sublist(0, 2));
+
+  print("Shares used for restoring the master secret:");
+  allShares..forEach((s) => print(s));
+
+  final recoveredSecret = String.fromCharCodes(
+      Slip39.recoverSecret(allShares, passphrase: passphrase));
+  print('\nMaster secret: $masterSecret');
+  print("Recovered one: $recoveredSecret");
+  assert(masterSecret == recoveredSecret);
+}
+
 ```
+
+## Package Direcotry Structure
+
+The `dart` package directory structure follows the official [dart's recommendations](https://dart.dev/tools/pub/package-layout).
+
 # LICENSE
 
 CopyRight (c) 2019 Pal Dorogi `"iLap"` <pal.dorogi@gmail.com>

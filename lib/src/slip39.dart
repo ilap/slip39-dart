@@ -12,33 +12,73 @@ import 'package:pointycastle/macs/hmac.dart';
 import 'package:pointycastle/src/utils.dart';
 
 part 'slip39_helpers.dart';
+part 'slip39_node.dart';
 
 ///
 /// The dart implementation of the [SLIP-0039: Shamir's Secret-Sharing for Mnemonic Codes](https://github.com/satoshilabs/slips/blob/master/slip-0039.md)
 ///
 class Slip39 {
   // Private constructor
-  Slip39._(
-      {this.root, iterationExponent, identifier, groupCount, groupThreshold})
-      : this.iterationExponent = iterationExponent ?? 0,
-        this.identifier = identifier ?? _generateIdentifier(),
+  Slip39._({root, groupCount, groupThreshold, iterationExponent, identifier})
+      : this._root = root,
         this.groupCount = groupCount ?? 0,
-        this.groupThreshold = groupThreshold ?? 0;
+        this.groupThreshold = groupThreshold ?? 0,
+        this.iterationExponent = iterationExponent ?? 0,
+        this.identifier = identifier ?? _generateIdentifier();
 
-  final Slip39Node root;
+  factory Slip39.from(
+    dynamic data, {
+    List<int> masterSecret = const [],
+    String passphrase = '',
+    int threshold = 0,
+    int iterationExponent = 0,
+  }) {
+    final name = data is Map ? data['name'] : 'Root';
+    threshold = data is Map ? data['threshold'] : threshold;
+    final groups = data is Map ? data['shares'] : data;
 
-  final int iterationExponent;
-  // Random identifier
-  final Uint8List identifier;
+    Slip39._validateParams(
+        masterSecret: masterSecret,
+        passphrase: passphrase,
+        threshold: threshold,
+        iterationExponent: iterationExponent,
+        groups: groups);
+
+    final identifier = _generateIdentifier();
+    final encryptedMasterSecret =
+        _crypt(masterSecret, passphrase, iterationExponent, identifier);
+
+    final slip = Slip39._(
+        iterationExponent: iterationExponent,
+        identifier: identifier,
+        groupCount: groups.length,
+        groupThreshold: threshold);
+
+    final buildFunc = data is Map ? slip._buildFromJson : slip._buildFromArray;
+    final currentNode = Slip39Node(name: name, threshold: threshold);
+
+    var root = buildFunc(
+        current: currentNode, nodes: groups, secret: encryptedMasterSecret);
+    return slip.copyWith(root: root);
+  }
+
+  static const _keyPrefix = 'r';
+  static const _maxDepth = 2;
+
+  final Slip39Node _root;
   final int groupCount;
   final int groupThreshold;
 
-  static const _maxDepth = 2;
-  static const _keyPrefix = 'r';
+  // Random identifier
+  final Uint8List identifier;
+  final int iterationExponent;
 
+  ///
+  /// Methods
+  ///
   Slip39 copyWith({Slip39Node root, String iterationExponent}) {
     return Slip39._(
-      root: root ?? this.root,
+      root: root ?? this._root,
       iterationExponent: iterationExponent ?? this.iterationExponent,
       identifier: identifier ?? this.identifier,
       groupCount: groupCount ?? this.groupCount,
@@ -46,14 +86,160 @@ class Slip39 {
     );
   }
 
-  factory Slip39.fromArray(
+  static List<int> recoverSecret(List<String> mnemonics,
+      {String passphrase = ''}) {
+    return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
+  }
+
+  Slip39Node fromPath(String path) {
+    _validatePath(path);
+
+    Iterable<int> children = _parseChildren(path);
+
+    if (children.isEmpty) {
+      return _root;
+    }
+
+    return children.fold(_root, (Slip39Node prev, int childNumber) {
+      if (childNumber >= prev._children.length) {
+        throw ArgumentError(
+            'The path index ($childNumber) exceeds the children index (${prev._children.length - 1}).');
+      }
+
+      return prev._children[childNumber];
+    });
+  }
+
+//Slip39Node _buildFromJson({Slip39Node current, List nodes, Uint8List secret, int threshold, int index = 0}) {
+  Slip39Node _buildFromJson(
+      {Slip39Node current, List nodes, Uint8List secret, int index = 0}) {
+    if (nodes.isEmpty) {
+      //print('DOIT: $identifier $iterationExponent  $index $groupThreshold $groupCount ${current._index} ${current._threshold} $secret');
+      final mnemonic = _encodeMnemonic(
+          identifier,
+          iterationExponent,
+          index,
+          groupThreshold,
+          groupCount,
+          current._index,
+          current._threshold,
+          secret);
+
+      return current._copyWith(mnemonic: mnemonic);
+    }
+
+    var children = [];
+    final secretShares = _splitSecret(current._threshold, nodes.length, secret);
+    var idx = 0;
+    nodes.forEach((item) {
+      var name;
+      var threshold;
+      var shares;
+      var node;
+
+      if (item is Map) {
+        name = item['name'];
+        threshold = item['threshold'];
+        shares = item['shares'];
+        node = Slip39Node(
+            name: item['name'], index: idx, threshold: item['threshold']);
+        shares = item['shares'];
+      } else if (item is List) {
+        name = 'Group $idx';
+        final n = item[0];
+        // m=members
+        final m = item[1];
+
+        threshold = n;
+        // Genereate leaf members, means their `m` is `0`
+        shares = List.unmodifiable(List.generate(m, (_) => [n, 0]));
+      } else {
+        threshold = current._threshold;
+        name = item;
+        shares = [];
+      }
+
+      node = Slip39Node(name: name, index: idx, threshold: threshold);
+
+      var branch = _buildFromJson(
+          current: node,
+          nodes: shares,
+          secret: Uint8List.fromList(secretShares[idx]),
+          index: current._index);
+      children..add(branch);
+      idx++;
+    });
+    return current._copyWith(children: List.unmodifiable(children));
+    //current = current._copyWith(children: List.unmodifiable(children.toList()));
+    //return current;
+  }
+
+  Slip39Node _buildFromArray(
+      {Slip39Node current, List nodes, Uint8List secret, int index = 0}) {
+    // It means it's a leaf.
+    if (nodes.isEmpty) {
+      //print('DOIT: $identifier $iterationExponent  $index $groupThreshold $groupCount ${current._index} ${current._threshold} $secret');
+      final mnemonic = _encodeMnemonic(
+          identifier,
+          iterationExponent,
+          index,
+          groupThreshold,
+          groupCount,
+          current._index,
+          current._threshold,
+          secret);
+
+      return current._copyWith(mnemonic: mnemonic);
+    }
+
+    final secretShares = _splitSecret(current._threshold, nodes.length, secret);
+    var idx = 0;
+    final children = <Slip39Node>[];
+    nodes.forEach((item) {
+      // n=threshold
+      final n = item[0];
+      // m=members
+      final m = item[1];
+
+      // Genereate leaf members, means their `m` is `0`
+      final members = List.generate(m, (_) => [n, 0]);
+
+      final node = Slip39Node(index: idx, threshold: n);
+      final branch = _buildFromArray(
+          current: node,
+          nodes: members,
+          secret: Uint8List.fromList(secretShares[idx]),
+          index: current._index);
+      children..add(branch);
+
+      idx++;
+    });
+    return current._copyWith(children: List.unmodifiable(children));
+  }
+
+  void _validatePath(String path) {
+    final source =
+        r'(^' + _keyPrefix + r')(\/\d{1,2}){0,' + _maxDepth.toString() + r'}$';
+    final regex = RegExp(source);
+
+    if (!regex.hasMatch(path)) {
+      throw ArgumentError('Expected valid path e.g. \'$_keyPrefix/0/0\'.');
+    }
+
+    final depth = path.split('/');
+    final pathLength = depth.length - 1;
+    if (pathLength > _maxDepth) {
+      throw ArgumentError(
+          'Path\'s (\'$path\') max depth ($_maxDepth) is exceeded ($pathLength).');
+    }
+  }
+
+  static void _validateParams(
       {List<int> masterSecret = const [],
-      String passphrase = '',
-      int iterationExponent = 0,
-      int threshold = 1,
-      List<List<int>> groups = const [
-        [1, 1]
-      ]}) {
+      String passphrase,
+      int iterationExponent,
+      int threshold,
+      List groups}) {
     if (masterSecret.length * 8 < _minEntropyBits) {
       throw Exception(
           'The length of the master secret (${masterSecret.length} bytes) must be at least ${_bitsToBytes(_minEntropyBits)} bytes.');
@@ -72,150 +258,32 @@ class Slip39 {
 
     if (threshold > groups.length) {
       throw Exception(
-          'The requested group threshold (${threshold}) must not exceed the number of groups (${groups.length}).');
+          'The requested group threshold ($threshold) must not exceed the number of groups (${groups.length}).');
     }
 
-    groups.forEach((item) => {
-          if (item[0] == 1 && item[1] > 1)
-            {
-              throw Exception(
-                  'Creating multiple member shares with member threshold 1 is not allowed. Use 1-of-1 member sharing instead. ${groups}')
-            }
-        });
-
-    final identifier = _generateIdentifier();
-
-    final slip = Slip39._(
-        iterationExponent: iterationExponent,
-        identifier: identifier,
-        groupCount: groups.length,
-        groupThreshold: threshold);
-    final ems =
-        _crypt(masterSecret, passphrase, iterationExponent, slip.identifier);
-
-    final root = slip._buildRecursive(
-      Slip39Node(),
-      groups,
-      ems,
-      threshold: threshold,
-    );
-    return slip.copyWith(root: root);
-  }
-
-  Slip39Node _buildRecursive(Slip39Node current, List nodes, Uint8List secret,
-      {int threshold, int index = 0}) {
-    // It means it's a leaf.
-    if (nodes.isEmpty) {
-      final mnemonic = _encodeMnemonic(identifier, iterationExponent, index,
-          groupThreshold, groupCount, current.index, threshold, secret);
-
-      return current.copyWith(mnemonic: mnemonic);
-    }
-
-    final secretShares = _splitSecret(threshold, nodes.length, secret);
-    var idx = 0;
-    final children = <Slip39Node>[];
-    nodes.forEach((item) {
-      // n=threshold
-      final n = item[0];
-      // m=members
-      final m = item[1];
-
-      // Genereate leaf members, means their `m` is `0`
-      final members = List.generate(m, (_) => [n, 0]);
-
-      final node = Slip39Node(index: idx);
-      final branch = _buildRecursive(
-          node, members, Uint8List.fromList(secretShares[idx]),
-          threshold: n, index: current.index);
-      children..add(branch);
-
-      idx++;
-    });
-    return current.copyWith(children: List.unmodifiable(children));
-  }
-
-  static List<int> recoverSecret(List<String> mnemonics,
-      {String passphrase = ''}) {
-    return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
-  }
-
-  Slip39Node fromPath(String path) {
-    _validatePath(path);
-
-    Iterable<int> children = _parseChildren(path);
-
-    if (children.isEmpty) {
-      return root;
-    }
-
-    return children.fold(root, (Slip39Node prev, int childNumber) {
-      if (childNumber >= prev._children.length) {
-        throw ArgumentError(
-            "The path index ($childNumber) exceeds the children index (${prev._children.length - 1}).");
+    groups.forEach((item) {
+      // Assume it's malformed.
+      var throwNeeded = true;
+      if (item is List) {
+        throwNeeded = item[0] == 1 && item[1] > 1;
+      } else if (item is Map) {
+        throwNeeded = item['threshold'] == 1 && item['shares'].length > 1;
       }
-
-      return prev._children[childNumber];
+      if (throwNeeded) {
+        throw Exception(
+            'Creating multiple member shares with member threshold 1 is not allowed. Use 1-of-1 member sharing instead. $groups');
+      }
     });
-  }
-
-  void _validatePath(String path) {
-    final source =
-        r"(^" + _keyPrefix + r")(\/\d{1,2}){0," + _maxDepth.toString() + r"}$";
-    final regex = new RegExp(source);
-
-    if (!regex.hasMatch(path)) {
-      throw ArgumentError("Expected valid path e.g. \"${_keyPrefix}/0/0\".");
-    }
-
-    final depth = path.split("/");
-    final pathLength = depth.length - 1;
-    if (pathLength > _maxDepth) {
-      throw ArgumentError(
-          "Path's (\"${path}\") max depth ($_maxDepth) is exceeded ($pathLength).");
-    }
   }
 
   Iterable<int> _parseChildren(String path) {
-    List<String> splitted = path.split("/")
+    List<String> splitted = path.split('/')
       ..removeAt(0)
-      ..removeWhere((child) => child == "");
+      ..removeWhere((child) => child == '');
 
     final result = splitted.map((String pathFragment) {
       return int.parse(pathFragment);
     });
     return result;
-  }
-}
-
-///
-/// Slip39Node
-///
-class Slip39Node {
-  Slip39Node({mnemonic, index, children})
-      : this._mnemonic = mnemonic ?? "",
-        this.index = index ?? 0,
-        this._children = children ?? <Slip39Node>[];
-
-  final String _mnemonic;
-  final int index;
-  final List<Slip39Node> _children;
-
-  List<String> get mnemonics {
-    if (_children.isEmpty) {
-      return [_mnemonic];
-    } else {
-      final result = _children.fold(<String>[], (prev, item) {
-        return prev..addAll(item.mnemonics);
-      });
-      return result;
-    }
-  }
-
-  Slip39Node copyWith({String mnemonic, int index, List<Slip39Node> children}) {
-    return Slip39Node(
-        mnemonic: mnemonic ?? this._mnemonic,
-        index: index ?? this.index,
-        children: children ?? this._children);
   }
 }

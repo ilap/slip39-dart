@@ -4,32 +4,34 @@ import 'dart:convert';
 import 'package:test/test.dart';
 import 'package:hex/hex.dart';
 
-import '../lib/slip39.dart';
+import 'package:slip39/slip39.dart';
 
-main() {
+void main() {
   final masterSecret = 'ABCDEFGHIJKLMNOP';
   final passphrase = 'TREZOR';
-  final oneGroup = [
+  final oneOfOne = [
+    [1, 1]
+  ];
+  final fiveOfSeven = [
     [5, 7]
   ];
 
-  final slip15 = Slip39.fromArray(
+  final slip15 = Slip39.from(fiveOfSeven,
       masterSecret: masterSecret.codeUnits,
       passphrase: passphrase,
-      threshold: 1,
-      groups: oneGroup);
+      threshold: 1);
 
-  final slip15NoPW = Slip39.fromArray(
-      masterSecret: masterSecret.codeUnits, threshold: 1, groups: oneGroup);
+  final slip15NoPW = Slip39.from(fiveOfSeven,
+      masterSecret: masterSecret.codeUnits, threshold: 1);
 
 //
 // Combinations C(n, k) of the grooups
 //
-  getCombinations(array, k) {
+  List getCombinations(array, k) {
     var result = List<List<int>>();
     var combinations = List<int>(k);
 
-    helper(int level, int start) {
+    void helper(int level, int start) {
       for (var i = start; i < array.length - k + level + 1; i++) {
         combinations[level] = array[i];
 
@@ -51,9 +53,10 @@ main() {
 
       var combinations = getCombinations([0, 1, 2, 3, 4, 5, 6], 5);
       combinations.forEach((item) {
-        var description = 'Test combination ${item.join(' ')}.';
+        item.shuffle();
+        var description = 'Test shuffled combination ${item.join(' ')}.';
         test(description, () {
-          var shares = item.map((idx) => mnemonics[idx]).toList();
+          var shares = item.map<String>((idx) => mnemonics[idx]).toList();
           assert(masterSecret ==
               String.fromCharCodes(
                   Slip39.recoverSecret(shares, passphrase: passphrase)));
@@ -88,41 +91,33 @@ main() {
     });
 
     group('Test iteration exponent', () {
-      final slip1 = Slip39.fromArray(
-          masterSecret: masterSecret.codeUnits, iterationExponent: 1);
-
-      final slip2 = Slip39.fromArray(
-          masterSecret: masterSecret.codeUnits, iterationExponent: 2);
-
       test(
           'should return valid mastersecret when user apply valid iteration exponent',
           () {
-        assert(masterSecret ==
-            String.fromCharCodes(
-                Slip39.recoverSecret(slip1.fromPath('r/0').mnemonics)));
+        final slip1 = Slip39.from(oneOfOne,
+            threshold: 1,
+            masterSecret: masterSecret.codeUnits,
+            iterationExponent: 1);
 
-        assert(masterSecret ==
-            String.fromCharCodes(
-                Slip39.recoverSecret(slip2.fromPath('r/0').mnemonics)));
+        final slip2 = Slip39.from(oneOfOne,
+            threshold: 1,
+            masterSecret: masterSecret.codeUnits,
+            iterationExponent: 2);
+        var m1 = slip1.fromPath('r/0').mnemonics;
+        var m2 = slip2.fromPath('r/0').mnemonics;
+        assert(masterSecret == String.fromCharCodes(Slip39.recoverSecret(m1)));
+
+        assert(masterSecret == String.fromCharCodes(Slip39.recoverSecret(m2)));
       });
-      /**
-     * assert.throws(() => x.y.z);
-     * assert.throws(() => x.y.z, ReferenceError);
-     * assert.throws(() => x.y.z, ReferenceError, /is not defined/);
-     * assert.throws(() => x.y.z, /is not defined/);
-     * assert.doesNotThrow(() => 42);
-     * assert.throws(() => x.y.z, Error);
-     * assert.throws(() => model.get.z, /Property does not exist in model schema./)
-     * Ref: https://stackoverflow.com/questions/21587122/mocha-chai-expect-to-throw-not-catching-thrown-errors
-     */
+
       test('should throw an Error when user submits invalid iteration exponent',
           () {
         expect(
-            () => Slip39.fromArray(
+            () => Slip39.from(oneOfOne,
                 masterSecret: masterSecret.codeUnits, iterationExponent: -1),
             throwsException);
         expect(
-            () => Slip39.fromArray(
+            () => Slip39.from(oneOfOne,
                 masterSecret: masterSecret.codeUnits, iterationExponent: 33),
             throwsException);
       });
@@ -132,22 +127,20 @@ main() {
 // FIXME: finish it.
   group('Group Sharing Tests', () {
     group('Test all valid combinations of mnemonics', () {
-      final groups = [
+      /*final groups = [
         [3, 5],
         [3, 3],
         [2, 5],
         [1, 1]
       ];
-      final slip = Slip39.fromArray(
-          masterSecret: masterSecret.codeUnits, threshold: 2, groups: groups);
-
-      final group2Mnemonics = slip.fromPath('r/2').mnemonics;
-      final group3Mnemonic = slip.fromPath('r/3').mnemonics[0];
-
+      final slip = Slip39.from(groups,  masterSecret: masterSecret.codeUnits, threshold: 2);
+      */
       test(
           'Should return the valid master secret when it tested with minimal sets of mnemonics.',
           () {
-        /*FIXME:  final mnemonics = group2Mnemonics.filter((_, index) {
+        /*  final mnemonics = slip.fromPath('r').mnemonics;
+        print(mnemonics);
+        group2Mnemonics.filter((_, index) {
         return index == 0 || index == 2;
       }).concat(group3Mnemonic);
 
@@ -179,7 +172,7 @@ main() {
       String ms = item[2];
 
       test(description, () {
-        if (ms.length != 0) {
+        if (ms.isNotEmpty) {
           List<int> result =
               Slip39.recoverSecret(mnemonics, passphrase: passphrase);
           assert(ms == HEX.encode(result));
@@ -191,7 +184,7 @@ main() {
     });
   });
 
-  /*group('Invalid Shares', () {
+  group('Invalid Shares', () {
     final tests = [
       [
         'Short master secret',
@@ -207,7 +200,7 @@ main() {
         [
           [2, 3]
         ],
-        masterSecret.codeUnits..add(55)
+        masterSecret.codeUnits + [55]
       ],
       [
         'Group threshold exceeds number of groups',
@@ -266,10 +259,10 @@ main() {
 
       test(description, () {
         expect(
-            Slip39.fromArray(
-                masterSecret: secret, threshold: threshold, groups: groups),
+            () =>
+                Slip39.from(groups, masterSecret: secret, threshold: threshold),
             throwsException);
       });
     });
-  });*/
+  });
 }

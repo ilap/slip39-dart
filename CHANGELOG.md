@@ -15,3 +15,8 @@ v0.1.4
 
 v0.1.5-dev.1
 * Changed versioning format.
+
+v0.1.5
+* Added JSON representaion of the shares.
+* Added more unittests.
+* Added dart analyzer option file.

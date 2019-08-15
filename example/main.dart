@@ -1,4 +1,4 @@
-import '../lib/slip39.dart';
+import 'package:slip39/slip39.dart';
 
 void main() {
   // threshold (N) number of group shares required to reconstruct the master secret.
@@ -18,18 +18,17 @@ void main() {
     [2, 6]
   ];
 
-  final slip = Slip39.fromArray(
+  final slip = Slip39.from(groups,
       masterSecret: masterSecret.codeUnits,
       passphrase: passphrase,
-      threshold: threshold,
-      groups: groups);
+      threshold: threshold);
 
   // One of Alice's share
   final aliceShare = slip.fromPath('r/0').mnemonics;
 
   // and any two of family's shares.
-  var familyShares = slip.fromPath('r/3/1').mnemonics;
-  familyShares = familyShares..addAll(slip.fromPath('r/3/3').mnemonics);
+  var familyShares = slip.fromPath('r/3/3').mnemonics;
+  familyShares = familyShares..addAll(slip.fromPath('r/3/2').mnemonics);
 
   final allShares = aliceShare..addAll(familyShares);
 
@@ -41,5 +40,4 @@ void main() {
   print('\nMaster secret: $masterSecret');
   print("Recovered one: $recoveredSecret");
   assert(masterSecret == recoveredSecret);
-  ;
 }
