@@ -108,7 +108,7 @@ import 'dart:convert';
 
 import 'package:slip39/slip39.dart';
 
-main() {
+void main() {
   String masterSecret = "ABCDEFGHIJKLMNOP";
   String passphrase = "TREZOR";
 
@@ -161,15 +161,15 @@ main() {
   final familyNode2 = masterNode.deriveByName('Family');
   assert(familyNode == familyNode2);
 
+  var familyShares = familyNode.mnemonics..shuffle();
+  familyShares = familyShares.sublist(0, 2);
+
   // Recover from: 3 of 5 firend's shares and 2 of 6 of family shares
   // three Friend's shares
-  final friendsShares = masterNode.deriveByName('Friends').mnemonics
-    ..shuffle()
-    ..sublist(0, 3);
-  final allShares = friendsShares
-    ..addAll(familyNode.mnemonics
-      ..shuffle()
-      ..sublist(0, 2));
+  var friendsShares = masterNode.deriveByName('Friends').mnemonics..shuffle();
+  friendsShares = friendsShares.sublist(0, 3);
+
+  final allShares = familyShares..addAll(friendsShares);
 
   print("Shares used for restoring the master secret:");
   allShares..forEach((s) => print(s));
@@ -180,7 +180,6 @@ main() {
   print("Recovered one: $recoveredSecret");
   assert(masterSecret == recoveredSecret);
 }
-
 ```
 
 ## Package Direcotry Structure
