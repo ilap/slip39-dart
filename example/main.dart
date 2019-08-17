@@ -1,4 +1,5 @@
 import 'package:slip39/slip39.dart';
+import 'dart:convert';
 
 void main() {
   // threshold (N) number of group shares required to reconstruct the master secret.
@@ -40,4 +41,7 @@ void main() {
   print('\nMaster secret: $masterSecret');
   print("Recovered one: $recoveredSecret");
   assert(masterSecret == recoveredSecret);
+
+  print('JSON generated from the \'array\' parameter:');
+  print(jsonEncode(slip.fromPath('r')));
 }

@@ -33,8 +33,12 @@ class Slip39 {
     int threshold = 0,
     int iterationExponent = 0,
   }) {
-    final name = data is Map ? data['name'] : 'Root';
-    threshold = data is Map ? data['threshold'] : threshold;
+    final name = data is Map ? data['name'] : 'All Shares';
+    try {
+      threshold = data is Map ? data['threshold'] : threshold;
+    } on Error {
+      throw 'Threshold must be a number';
+    }
     final groups = data is Map ? data['shares'] : data;
 
     Slip39._validateParams(
@@ -54,10 +58,9 @@ class Slip39 {
         groupCount: groups.length,
         groupThreshold: threshold);
 
-    final buildFunc = data is Map ? slip._buildFromJson : slip._buildFromArray;
     final currentNode = Slip39Node(name: name, threshold: threshold);
 
-    var root = buildFunc(
+    var root = slip._from(
         current: currentNode, nodes: groups, secret: encryptedMasterSecret);
     return slip.copyWith(root: root);
   }
@@ -110,11 +113,16 @@ class Slip39 {
     });
   }
 
-//Slip39Node _buildFromJson({Slip39Node current, List nodes, Uint8List secret, int threshold, int index = 0}) {
-  Slip39Node _buildFromJson(
-      {Slip39Node current, List nodes, Uint8List secret, int index = 0}) {
+  Slip39Node _from(
+      {Slip39Node current,
+      List nodes,
+      Uint8List secret,
+      int index = 0,
+      int depth = 0}) {
+    if (depth++ > _maxDepth) {
+      throw 'The dart implementation of the `Slip39` only supports ${_maxDepth + 1} level tree.';
+    }
     if (nodes.isEmpty) {
-      //print('DOIT: $identifier $iterationExponent  $index $groupThreshold $groupCount ${current._index} ${current._threshold} $secret');
       final mnemonic = _encodeMnemonic(
           identifier,
           iterationExponent,
@@ -140,12 +148,12 @@ class Slip39 {
       if (item is Map) {
         name = item['name'];
         threshold = item['threshold'];
-        shares = item['shares'];
-        node = Slip39Node(
-            name: item['name'], index: idx, threshold: item['threshold']);
+        if (threshold is String) {
+          throw 'Threshold must be a number';
+        }
         shares = item['shares'];
       } else if (item is List) {
-        name = 'Group $idx';
+        name = item[1] != 0 ? 'Group Shares ${idx + 1}' : 'Share ${idx + 1}';
         final n = item[0];
         // m=members
         final m = item[1];
@@ -154,64 +162,20 @@ class Slip39 {
         // Genereate leaf members, means their `m` is `0`
         shares = List.unmodifiable(List.generate(m, (_) => [n, 0]));
       } else {
-        threshold = current._threshold;
         name = item;
+        threshold = current._threshold;
         shares = [];
       }
 
       node = Slip39Node(name: name, index: idx, threshold: threshold);
 
-      var branch = _buildFromJson(
+      var branch = _from(
           current: node,
           nodes: shares,
           secret: Uint8List.fromList(secretShares[idx]),
-          index: current._index);
+          index: current._index,
+          depth: depth);
       children..add(branch);
-      idx++;
-    });
-    return current._copyWith(children: List.unmodifiable(children));
-    //current = current._copyWith(children: List.unmodifiable(children.toList()));
-    //return current;
-  }
-
-  Slip39Node _buildFromArray(
-      {Slip39Node current, List nodes, Uint8List secret, int index = 0}) {
-    // It means it's a leaf.
-    if (nodes.isEmpty) {
-      //print('DOIT: $identifier $iterationExponent  $index $groupThreshold $groupCount ${current._index} ${current._threshold} $secret');
-      final mnemonic = _encodeMnemonic(
-          identifier,
-          iterationExponent,
-          index,
-          groupThreshold,
-          groupCount,
-          current._index,
-          current._threshold,
-          secret);
-
-      return current._copyWith(mnemonic: mnemonic);
-    }
-
-    final secretShares = _splitSecret(current._threshold, nodes.length, secret);
-    var idx = 0;
-    final children = <Slip39Node>[];
-    nodes.forEach((item) {
-      // n=threshold
-      final n = item[0];
-      // m=members
-      final m = item[1];
-
-      // Genereate leaf members, means their `m` is `0`
-      final members = List.generate(m, (_) => [n, 0]);
-
-      final node = Slip39Node(index: idx, threshold: n);
-      final branch = _buildFromArray(
-          current: node,
-          nodes: members,
-          secret: Uint8List.fromList(secretShares[idx]),
-          index: current._index);
-      children..add(branch);
-
       idx++;
     });
     return current._copyWith(children: List.unmodifiable(children));

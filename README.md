@@ -43,7 +43,7 @@ Add the following into the `pubspec.yaml`:
 
 ```
 dependencies:
-  slip39: ^0.1.5
+  slip39: ^0.1.6-dev.1
 ```
 
 ## Example
