@@ -23,3 +23,6 @@ v0.1.5
 
 v0.1.6-dev.1
 * Removed redundant code.
+
+v0.1.6-dev.2
+* Added validateMnemonic

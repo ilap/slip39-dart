@@ -94,6 +94,10 @@ class Slip39 {
     return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
   }
 
+  static bool validateMnemonic(mnemonic) {
+    return _validateMnemonic(mnemonic);
+  }
+
   Slip39Node fromPath(String path) {
     _validatePath(path);
 

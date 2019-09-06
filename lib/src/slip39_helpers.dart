@@ -512,13 +512,16 @@ Map _decodeMnemonic(mnemonic) {
   try {
     final valueByteCount =
         _bitsToBytes(_radixBits * valueData.length - paddingLen);
-    final share = encodeBigInt(valueInt);
+    var share = encodeBigInt(valueInt);
 
+    if (share.length > valueByteCount) {
+      // padding error
+      throw Exception('Padding error');
+    }
     // Add zero paddings
     var shareLength = share.length;
 
     while (shareLength++ < valueByteCount) {
-      print('INZERTEDDDD: $share');
       share.insert(0, 0x0);
     }
 
@@ -534,6 +537,16 @@ Map _decodeMnemonic(mnemonic) {
     };
   } on Exception catch (e) {
     throw Exception('Invalid mnemonic padding ($e}');
+  }
+}
+
+bool _validateMnemonic(mnemonic) {
+  try {
+    _decodeMnemonic(mnemonic);
+    return true;
+  }
+  catch (error) {
+    return false;
   }
 }
 

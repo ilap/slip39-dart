@@ -1,6 +1,6 @@
 name: slip39
 description: The dart implementation of the SLIP39 for Shamir's Secret-Sharing for Mnemonic Codes.
-version: 0.1.6-dev.1
+version: 0.1.6-dev.2
 author: Pal Dorogi "ilap"<pal.dorogi@gmail.com>
 homepage: https://github.com/ilap/slip39-dart
 
