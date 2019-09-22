@@ -316,7 +316,7 @@ List<int> _intToIndices(BigInt value, length, bits) {
   return result.reversed.toList();
 }
 
-String _mnemomicFromIndices(List indices) {
+String _mnemonicFromIndices(List indices) {
   final result = indices.fold('', (prev, index) {
     final separator = prev == '' ? '' : ' ';
     return prev + separator + _wordList[index];
@@ -326,15 +326,15 @@ String _mnemomicFromIndices(List indices) {
 
 List<int> _mnemonicToIndices(String mnemonic) {
   final words = mnemonic.toLowerCase().split(' ');
-  try {
-    final result = words.fold(<int>[], (prev, item) {
-      final index = _wordListMap[item];
-      return prev..add(index);
-    });
-    return result;
-  } on Error catch (e) {
-    throw Exception('Invalid mnemonic word $e.');
-  }
+
+  final result = words.fold(<int>[], (prev, item) {
+    final index = _wordListMap[item];
+    if (index == null) {
+      throw Exception('Invalid mnemonic word $item.');
+    }
+    return prev..add(index);
+  });
+  return result;
 }
 
 Uint8List _recoverSecret(threshold, shares) {
@@ -395,7 +395,7 @@ List<int> _combineMnemonics({List<String> mnemonics, String passphrase = ''}) {
         groupCount,
       );
       throw Exception(
-          'Wrong number of mnemonics. Expected $groupIndex mnemonics starting with ${_mnemomicFromIndices(prefix)}, \n but ${members.length} were provided.');
+          'Wrong number of mnemonics. Expected $groupIndex mnemonics starting with ${_mnemonicFromIndices(prefix)}, \n but ${members.length} were provided.');
     }
 
     final recovered = _recoverSecret(threshold, shares);
@@ -409,7 +409,7 @@ List<int> _combineMnemonics({List<String> mnemonics, String passphrase = ''}) {
   return ms;
 }
 
-Map _decodeMnemonics(mnemonics) {
+Map _decodeMnemonics(List<String> mnemonics) {
   final identifiers = Set();
   final iterationExponents = Set();
   final groupThresholds = Set();
@@ -466,7 +466,7 @@ Map _decodeMnemonics(mnemonics) {
 ///
 /// Converts a share mnemonic to share data.
 ///
-Map _decodeMnemonic(mnemonic) {
+Map _decodeMnemonic(String mnemonic) {
   final data = _mnemonicToIndices(mnemonic);
 
   if (data.length < _minMnemonicWordsLength) {
@@ -540,12 +540,11 @@ Map _decodeMnemonic(mnemonic) {
   }
 }
 
-bool _validateMnemonic(mnemonic) {
+bool _validateMnemonic(String mnemonic) {
   try {
     _decodeMnemonic(mnemonic);
     return true;
-  }
-  catch (error) {
+  } catch (error) {
     return false;
   }
 }
@@ -610,7 +609,7 @@ String _encodeMnemonic(
     ..addAll(tp);
   final checksum = _rs1024CreateChecksum(shareData);
 
-  return _mnemomicFromIndices(shareData + checksum);
+  return _mnemonicFromIndices(shareData + checksum);
 }
 
 /// The precomputed exponent and log tables.

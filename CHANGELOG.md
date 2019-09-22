@@ -26,3 +26,8 @@ v0.1.6-dev.1
 
 v0.1.6-dev.2
 * Added validateMnemonic
+
+v0.1.6-dev.3
+* Added changes based on Auronmatrix`s PRs of the https://github.com/ilap/slip39-js/issues/4
+
+
