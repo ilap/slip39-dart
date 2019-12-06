@@ -148,7 +148,7 @@ void main() {
       */
       });
       test(
-          'TODO: Should NOT return the valid master secret when one compvare group and one incompvare group out of two groups required',
+          'TODO: Should NOT return the valid master secret when one compare group and one incompvare group out of two groups required',
           () {
         assert(true);
       });
@@ -342,5 +342,27 @@ void main() {
             throwsException);
       });
     });
+  });
+  group("Groups test (T=1, N=1 e.g. [1,1]) - ", () {
+    final totalGroups = 16;
+    final groups = List<List<int>>.generate(totalGroups, (_) => [1, 1]);
+
+    for (int group = 1; group <= totalGroups; group++) {
+      for (int threshold = 1; threshold <= group; threshold++) {
+        test(
+            "recover master secret for $threshold shares (threshold=$threshold) of $group '[1, 1,]' groups",
+            () {
+          final slip = Slip39.from(groups.sublist(0, group),
+              masterSecret: masterSecret.codeUnits,
+              passphrase: passphrase,
+              threshold: threshold);
+
+          final mnemonics = slip.fromPath('r').mnemonics.sublist(0, threshold);
+          final recoveredSecret =
+              Slip39.recoverSecret(mnemonics, passphrase: passphrase);
+          assert(masterSecret == String.fromCharCodes(recoveredSecret));
+        });
+      }
+    }
   });
 }

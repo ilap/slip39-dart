@@ -515,14 +515,11 @@ Map _decodeMnemonic(String mnemonic) {
     var share = encodeBigInt(valueInt);
 
     if (share.length > valueByteCount) {
-      // padding error
       throw Exception('Padding error');
-    }
-    // Add zero paddings
-    var shareLength = share.length;
-
-    while (shareLength++ < valueByteCount) {
-      share.insert(0, 0x0);
+    } else if (share.length < valueByteCount) {
+      // Add zero paddings
+      share =
+          Uint8List.fromList(Uint8List(valueByteCount - share.length) + share);
     }
 
     return {
