@@ -8,8 +8,6 @@ import 'package:pointycastle/digests/sha256.dart';
 import 'package:pointycastle/key_derivators/api.dart' show Pbkdf2Parameters;
 import 'package:pointycastle/key_derivators/pbkdf2.dart';
 import 'package:pointycastle/macs/hmac.dart';
-//import 'package:pointycastle/random/fortuna_random.dart';
-import 'package:pointycastle/src/utils.dart';
 
 part 'slip39_helpers.dart';
 part 'slip39_node.dart';
@@ -19,11 +17,16 @@ part 'slip39_node.dart';
 ///
 class Slip39 {
   // Private constructor
-  Slip39._({root, groupCount, groupThreshold, iterationExponent, identifier})
+  Slip39._(
+      {Slip39Node? root,
+      int groupCount = 0,
+      int groupThreshold = 0,
+      int iterationExponent = 0,
+      Uint8List? identifier})
       : this._root = root,
-        this.groupCount = groupCount ?? 0,
-        this.groupThreshold = groupThreshold ?? 0,
-        this.iterationExponent = iterationExponent ?? 0,
+        this.groupCount = groupCount,
+        this.groupThreshold = groupThreshold,
+        this.iterationExponent = iterationExponent,
         this.identifier = identifier ?? _generateIdentifier();
 
   factory Slip39.from(
@@ -60,7 +63,7 @@ class Slip39 {
 
     final currentNode = Slip39Node(name: name, threshold: threshold);
 
-    var root = slip._from(
+    final root = slip._from(
         current: currentNode, nodes: groups, secret: encryptedMasterSecret);
     return slip.copyWith(root: root);
   }
@@ -68,7 +71,7 @@ class Slip39 {
   static const _keyPrefix = 'r';
   static const _maxDepth = 2;
 
-  final Slip39Node _root;
+  final Slip39Node? _root;
   final int groupCount;
   final int groupThreshold;
 
@@ -79,19 +82,19 @@ class Slip39 {
   ///
   /// Methods
   ///
-  Slip39 copyWith({Slip39Node root, String iterationExponent}) {
+  Slip39 copyWith({required Slip39Node root}) {
     return Slip39._(
-      root: root ?? this._root,
-      iterationExponent: iterationExponent ?? this.iterationExponent,
-      identifier: identifier ?? this.identifier,
-      groupCount: groupCount ?? this.groupCount,
-      groupThreshold: groupThreshold ?? this.groupThreshold,
+      root: root,
+      iterationExponent: this.iterationExponent,
+      identifier: this.identifier,
+      groupCount: this.groupCount,
+      groupThreshold: this.groupThreshold,
     );
   }
 
   static List<int> recoverSecret(List<String> mnemonics,
       {String passphrase = ''}) {
-    return _combineMnemonics(mnemonics: mnemonics, passphrase: passphrase);
+    return _combineMnemonics(mnemonics, passphrase: passphrase);
   }
 
   static bool validateMnemonic(mnemonic) {
@@ -104,10 +107,10 @@ class Slip39 {
     Iterable<int> children = _parseChildren(path);
 
     if (children.isEmpty) {
-      return _root;
+      return _root!;
     }
 
-    return children.fold(_root, (Slip39Node prev, int childNumber) {
+    return children.fold(_root!, (Slip39Node prev, int childNumber) {
       if (childNumber >= prev._children.length) {
         throw ArgumentError(
             'The path index ($childNumber) exceeds the children index (${prev._children.length - 1}).');
@@ -118,9 +121,9 @@ class Slip39 {
   }
 
   Slip39Node _from(
-      {Slip39Node current,
-      List nodes,
-      Uint8List secret,
+      {required Slip39Node current,
+      required List nodes,
+      required Uint8List secret,
       int index = 0,
       int depth = 0}) {
     if (depth++ > _maxDepth) {
@@ -141,7 +144,8 @@ class Slip39 {
     }
 
     var children = [];
-    final secretShares = _splitSecret(current._threshold, nodes.length, secret);
+    final secretShares =
+        _splitSecret(current._threshold, nodes.length, secret);
     var idx = 0;
     nodes.forEach((item) {
       var name;
@@ -204,10 +208,10 @@ class Slip39 {
 
   static void _validateParams(
       {List<int> masterSecret = const [],
-      String passphrase,
-      int iterationExponent,
-      int threshold,
-      List groups}) {
+      required String passphrase,
+      required int iterationExponent,
+      required int threshold,
+      required List groups}) {
     if (masterSecret.length * 8 < _minEntropyBits) {
       throw Exception(
           'The length of the master secret (${masterSecret.length} bytes) must be at least ${_bitsToBytes(_minEntropyBits)} bytes.');

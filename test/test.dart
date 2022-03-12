@@ -28,8 +28,8 @@ void main() {
 // Combinations C(n, k) of the grooups
 //
   List getCombinations(array, k) {
-    var result = List<List<int>>();
-    var combinations = List<int>(k);
+    List<List<int>> result = List<List<int>>.empty(growable: true);
+    var combinations = List<int>.filled(k, 0);
 
     void helper(int level, int start) {
       for (var i = start; i < array.length - k + level + 1; i++) {
@@ -167,12 +167,15 @@ void main() {
     final tests = JsonDecoder().convert(contents);
 
     tests.forEach((item) {
-      String description = item[0];
-      var mnemonics = List<String>.from(item[1]);
-      String ms = item[2];
+      String? description = item[0];
+      final mnemonics = List<String>.from(item[1]);
+      String? ms = item[2];
+      if (item[0].toString().startsWith("17.")) {
+        print("TEST:");
+      }
 
       test(description, () {
-        if (ms.isNotEmpty) {
+        if (ms!.isNotEmpty) {
           List<int> result =
               Slip39.recoverSecret(mnemonics, passphrase: passphrase);
           assert(ms == HEX.encode(result));
@@ -241,7 +244,7 @@ void main() {
 
   group('Mnemonic validation', () {
     vectors.forEach((item) {
-      final mnemonics = List<String>.from(item[1]);
+      final mnemonics = List<String>.from(item[1] as Iterable<dynamic>);
       var index = 0;
       test('Mnemonic at index ${index++} should be invalid', () {
         mnemonics.forEach((mnemonic) {
@@ -337,8 +340,9 @@ void main() {
 
       test(description, () {
         expect(
-            () =>
-                Slip39.from(groups, masterSecret: secret, threshold: threshold),
+            () => Slip39.from(groups,
+                masterSecret: secret as List<int>,
+                threshold: threshold as int),
             throwsException);
       });
     });

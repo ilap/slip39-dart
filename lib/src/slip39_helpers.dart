@@ -98,9 +98,10 @@ Uint8List _crypt(List masterSecret, String passphrase, int iterationExponent,
     throw Exception(
         'Invalid iteration exponent ($iterationExponent). Expected between 0 and $_maxIterationExponent');
   }
-  var IL =
-      Uint8List.fromList(masterSecret.sublist(0, masterSecret.length ~/ 2));
-  var IR = Uint8List.fromList(masterSecret.sublist(masterSecret.length ~/ 2));
+  var IL = Uint8List.fromList(
+      masterSecret.sublist(0, masterSecret.length ~/ 2) as List<int>);
+  var IR = Uint8List.fromList(
+      masterSecret.sublist(masterSecret.length ~/ 2) as List<int>);
 
   final pwd = Uint8List.fromList(passphrase.codeUnits);
 
@@ -279,7 +280,7 @@ int _rs1024Polymod(values) {
   return chk;
 }
 
-List<int> _rs1024CreateChecksum(data) {
+List<int> _rs1024CreateChecksum(List<int> data) {
   final values =
       _saltString.codeUnits + data + List<int>.filled(_checksumWordsLength, 0);
 
@@ -311,13 +312,13 @@ BigInt _intFromIndices(List indices) {
 ///
 List<int> _intToIndices(BigInt value, length, bits) {
   final mask = BigInt.from((1 << bits) - 1);
-  final result =
-      List.generate(length, (i) => (((value >> (i * bits)) & mask)).toInt());
+  final result = List.generate(
+      length, (i) => ((value >> (i * bits as int)) & mask).toInt());
   return result.reversed.toList();
 }
 
 String _mnemonicFromIndices(List indices) {
-  final result = indices.fold('', (prev, index) {
+  final result = indices.fold('', (dynamic prev, index) {
     final separator = prev == '' ? '' : ' ';
     return prev + separator + _wordList[index];
   });
@@ -327,7 +328,7 @@ String _mnemonicFromIndices(List indices) {
 List<int> _mnemonicToIndices(String mnemonic) {
   final words = mnemonic.toLowerCase().split(' ');
 
-  final result = words.fold(<int>[], (prev, item) {
+  final result = words.fold(<int>[], (dynamic prev, item) {
     final index = _wordListMap[item];
     if (index == null) {
       throw Exception('Invalid mnemonic word $item.');
@@ -360,8 +361,8 @@ Uint8List _recoverSecret(threshold, shares) {
 /// Combines mnemonic shares to obtain the master secret which was previously
 /// split using Shamir's secret sharing scheme.
 //
-List<int> _combineMnemonics({List<String> mnemonics, String passphrase = ''}) {
-  if (mnemonics == null || mnemonics.isEmpty) {
+List<int> _combineMnemonics(List<String> mnemonics, {String passphrase = ''}) {
+  if (mnemonics.isEmpty) {
     throw Exception('The list of mnemonics is empty.');
   }
 
@@ -512,7 +513,7 @@ Map _decodeMnemonic(String mnemonic) {
   try {
     final valueByteCount =
         _bitsToBytes(_radixBits * valueData.length - paddingLen);
-    var share = encodeBigInt(valueInt);
+    var share = _encodeBigInt(valueInt);
 
     if (share.length > valueByteCount) {
       throw Exception('Padding error');
@@ -535,6 +536,20 @@ Map _decodeMnemonic(String mnemonic) {
   } on Exception catch (e) {
     throw Exception('Invalid mnemonic padding ($e}');
   }
+}
+
+var _byteMask = BigInt.from(0xff);
+final negativeFlag = BigInt.from(0x80);
+
+Uint8List _encodeBigInt(BigInt number) {
+  // Not handling negative numbers.
+  int size = (number.bitLength + 7) >> 3;
+  var result = new Uint8List(size);
+  for (int i = 0; i < size; i++) {
+    result[size - i - 1] = (number & _byteMask).toInt();
+    number = number >> 8;
+  }
+  return result;
 }
 
 bool _validateMnemonic(String mnemonic) {
@@ -562,7 +577,7 @@ List<int> _groupPrefix(
 }
 
 bool _listsAreEqual(List a, List b) {
-  if (a == null || b == null || a.length != b.length) {
+  if (a.length != b.length) {
     return false;
   }
 
@@ -588,7 +603,7 @@ String _encodeMnemonic(
 // Convert the share value from bytes to wordlist indices.
   final valueWordCount = _bitsToWords(value.length * 8);
 
-  BigInt valueInt = decodeBigInt(value);
+  BigInt valueInt = _decodeBigInt(value);
   identifier = int.parse(HEX.encode(identifier), radix: 16);
 
   final gp = _groupPrefix(
@@ -607,6 +622,15 @@ String _encodeMnemonic(
   final checksum = _rs1024CreateChecksum(shareData);
 
   return _mnemonicFromIndices(shareData + checksum);
+}
+
+BigInt _decodeBigInt(List<int> bytes) {
+  BigInt result = new BigInt.from(0);
+
+  for (int i = 0; i < bytes.length; i++) {
+    result += new BigInt.from(bytes[bytes.length - i - 1]) << (8 * i);
+  }
+  return result;
 }
 
 /// The precomputed exponent and log tables.

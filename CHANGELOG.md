@@ -33,3 +33,7 @@ v0.1.6-dev.3
 v0.1.6-dev.4
 * Added changes based on iancoleman's PR (https://github.com/ilap/slip39-js/issues/12)
 * Removed redundant unit test.
+
+v0.2.0
+* Migrated to null-safety.
+* Use an own decodeBigInt and encodeBigInt as the pointycastle's started handling negative BigInts which is not implemented in SLIP-0039.

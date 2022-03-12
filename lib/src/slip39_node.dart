@@ -14,13 +14,13 @@ class Slip39Node {
   final int _index;
   final String _mnemonic;
   final int _threshold;
-  final String name;
+  final String? name;
 
   List<String> get mnemonics {
     if (_children.isEmpty) {
       return [_mnemonic];
     } else {
-      final result = _children.fold(<String>[], (prev, item) {
+      final result = _children.fold(<String>[], (dynamic prev, item) {
         return prev..addAll(item.mnemonics);
       });
       return result;
@@ -28,11 +28,11 @@ class Slip39Node {
   }
 
   Slip39Node _copyWith(
-      {String name,
-      String mnemonic,
-      int threshold,
-      int index,
-      List<Slip39Node> children}) {
+      {String? name,
+      String? mnemonic,
+      int? threshold,
+      int? index,
+      List<Slip39Node>? children}) {
     return Slip39Node(
         name: name ?? this.name,
         mnemonic: mnemonic ?? this._mnemonic,
@@ -41,7 +41,7 @@ class Slip39Node {
         children: children ?? this._children);
   }
 
-  Map<String, Object> toJson() {
+  Map<String, Object?> toJson() {
     var encoded = _children.map((child) {
       if (child._children.isEmpty) {
         return child.name;
