@@ -1,6 +1,7 @@
 # slip39-dart
 
 [![pub package](https://img.shields.io/pub/v/slip39.svg)](https://pub.dartlang.org/packages/slip39)
+[![Dart CI](https://github.com/ilap/slip39-dart/actions/workflows/dart.yml/badge.svg?branch=master)](https://github.com/ilap/slip39-dart/actions/workflows/dart.yml)
 
 The dart implementation of the [SLIP39](https://github.com/satoshilabs/slips/blob/master/slip-0039.md) for Shamir's Secret-Sharing for Mnemonic Codes.
 
