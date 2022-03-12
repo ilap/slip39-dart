@@ -2,12 +2,14 @@ import 'dart:core';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:hex/hex.dart';
-import 'package:pointycastle/api.dart';
-import 'package:pointycastle/digests/sha256.dart';
-import 'package:pointycastle/key_derivators/api.dart' show Pbkdf2Parameters;
-import 'package:pointycastle/key_derivators/pbkdf2.dart';
-import 'package:pointycastle/macs/hmac.dart';
+import 'package:pinenacl/api.dart';
+import 'package:pinenacl/encoding.dart';
+
+import 'package:pinenacl/key_derivation.dart';
+import 'package:pinenacl/tweetnacl.dart';
+
+//import 'package:hex/hex.dart';
+
 
 part 'slip39_helpers.dart';
 part 'slip39_node.dart';
@@ -31,7 +33,7 @@ class Slip39 {
 
   factory Slip39.from(
     dynamic data, {
-    List<int> masterSecret = const [],
+    required Uint8List masterSecret,
     String passphrase = '',
     int threshold = 0,
     int iterationExponent = 0,

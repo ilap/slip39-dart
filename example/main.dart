@@ -1,5 +1,7 @@
-import 'package:slip39/slip39.dart';
 import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:slip39/slip39.dart';
 
 void main() {
   // threshold (N) number of group shares required to reconstruct the master secret.
@@ -20,7 +22,7 @@ void main() {
   ];
 
   final slip = Slip39.from(groups,
-      masterSecret: masterSecret.codeUnits,
+      masterSecret: Uint8List.fromList(masterSecret.codeUnits),
       passphrase: passphrase,
       threshold: threshold);
 

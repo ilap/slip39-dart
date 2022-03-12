@@ -4,17 +4,17 @@ part of 'slip39.dart';
 /// Slip39Node
 ///
 class Slip39Node {
-  Slip39Node({this.name, mnemonic, index, threshold, children})
-      : this._mnemonic = mnemonic ?? "",
-        this._index = index ?? 0,
-        this._threshold = threshold ?? 1,
-        this._children = children ?? <Slip39Node>[];
+  Slip39Node({required this.name, String mnemonic = "", int index = 0, int threshold = 1, List<Slip39Node> children = const <Slip39Node>[]})
+      : this._mnemonic = mnemonic,
+        this._index = index,
+        this._threshold = threshold,
+        this._children = children;
 
   final List<Slip39Node> _children;
   final int _index;
   final String _mnemonic;
   final int _threshold;
-  final String? name;
+  final String name;
 
   List<String> get mnemonics {
     if (_children.isEmpty) {

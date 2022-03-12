@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 
+
+import 'package:pinenacl/ed25519.dart';
 import 'package:test/test.dart';
-import 'package:hex/hex.dart';
 
 import 'package:slip39/slip39.dart';
 
@@ -17,12 +19,12 @@ void main() {
   ];
 
   final slip15 = Slip39.from(fiveOfSeven,
-      masterSecret: masterSecret.codeUnits,
+      masterSecret: Uint8List.fromList(masterSecret.codeUnits),
       passphrase: passphrase,
       threshold: 1);
 
   final slip15NoPW = Slip39.from(fiveOfSeven,
-      masterSecret: masterSecret.codeUnits, threshold: 1);
+      masterSecret: Uint8List.fromList(masterSecret.codeUnits), threshold: 1);
 
 //
 // Combinations C(n, k) of the grooups
@@ -96,12 +98,12 @@ void main() {
           () {
         final slip1 = Slip39.from(oneOfOne,
             threshold: 1,
-            masterSecret: masterSecret.codeUnits,
+            masterSecret: Uint8List.fromList(masterSecret.codeUnits),
             iterationExponent: 1);
 
         final slip2 = Slip39.from(oneOfOne,
             threshold: 1,
-            masterSecret: masterSecret.codeUnits,
+            masterSecret: Uint8List.fromList(masterSecret.codeUnits),
             iterationExponent: 2);
         var m1 = slip1.fromPath('r/0').mnemonics;
         var m2 = slip2.fromPath('r/0').mnemonics;
@@ -114,11 +116,11 @@ void main() {
           () {
         expect(
             () => Slip39.from(oneOfOne,
-                masterSecret: masterSecret.codeUnits, iterationExponent: -1),
+                masterSecret: Uint8List.fromList(masterSecret.codeUnits), iterationExponent: -1),
             throwsException);
         expect(
             () => Slip39.from(oneOfOne,
-                masterSecret: masterSecret.codeUnits, iterationExponent: 33),
+                masterSecret: Uint8List.fromList(masterSecret.codeUnits), iterationExponent: 33),
             throwsException);
       });
     });
@@ -133,7 +135,7 @@ void main() {
         [2, 5],
         [1, 1]
       ];
-      final slip = Slip39.from(groups,  masterSecret: masterSecret.codeUnits, threshold: 2);
+      final slip = Slip39.from(groups,  masterSecret: Uint8List.fromList(masterSecret.codeUnits), threshold: 2);
       */
       test(
           'Should return the valid master secret when it tested with minimal sets of mnemonics.',
@@ -144,7 +146,7 @@ void main() {
         return index == 0 || index == 2;
       }).concat(group3Mnemonic);
 
-      assert(masterSecret.codeUnits == String.fromCharCodes(Slip39.recoverSecret(mnemonics)));
+      assert(Uint8List.fromList(masterSecret.codeUnits) == String.fromCharCodes(Slip39.recoverSecret(mnemonics)));
       */
       });
       test(
@@ -178,7 +180,7 @@ void main() {
         if (ms!.isNotEmpty) {
           List<int> result =
               Slip39.recoverSecret(mnemonics, passphrase: passphrase);
-          assert(ms == HEX.encode(result));
+          assert(ms == HexCoder.instance.encode(result));
         } else {
           expect(() => Slip39.recoverSecret(mnemonics, passphrase: passphrase),
               throwsException);
@@ -273,7 +275,7 @@ void main() {
         [
           [2, 3]
         ],
-        masterSecret.codeUnits.sublist(0, 14)
+        Uint8List.fromList(masterSecret.codeUnits).sublist(0, 14)
       ],
       [
         'Odd length master secret',
@@ -281,7 +283,7 @@ void main() {
         [
           [2, 3]
         ],
-        masterSecret.codeUnits + [55]
+        Uint8List.fromList(masterSecret.codeUnits) + [55]
       ],
       [
         'Group threshold exceeds number of groups',
@@ -290,7 +292,7 @@ void main() {
           [3, 5],
           [2, 5]
         ],
-        masterSecret.codeUnits
+        Uint8List.fromList(masterSecret.codeUnits)
       ],
       [
         'Invalid group threshold.',
@@ -299,7 +301,7 @@ void main() {
           [3, 5],
           [2, 5]
         ],
-        masterSecret.codeUnits
+        Uint8List.fromList(masterSecret.codeUnits)
       ],
       [
         'Member threshold exceeds number of members',
@@ -308,7 +310,7 @@ void main() {
           [3, 2],
           [2, 5]
         ],
-        masterSecret.codeUnits
+        Uint8List.fromList(masterSecret.codeUnits)
       ],
       [
         'Invalid member threshold',
@@ -317,7 +319,7 @@ void main() {
           [0, 2],
           [2, 5]
         ],
-        masterSecret.codeUnits
+        Uint8List.fromList(masterSecret.codeUnits)
       ],
       [
         'Group with multiple members and threshold 1',
@@ -327,7 +329,7 @@ void main() {
           [1, 3],
           [2, 5]
         ],
-        masterSecret.codeUnits
+        Uint8List.fromList(masterSecret.codeUnits)
       ]
     ];
 
@@ -341,7 +343,7 @@ void main() {
       test(description, () {
         expect(
             () => Slip39.from(groups,
-                masterSecret: secret as List<int>,
+                masterSecret: Uint8List.fromList(secret as List<int>),
                 threshold: threshold as int),
             throwsException);
       });
@@ -357,7 +359,7 @@ void main() {
             "recover master secret for $threshold shares (threshold=$threshold) of $group '[1, 1,]' groups",
             () {
           final slip = Slip39.from(groups.sublist(0, group),
-              masterSecret: masterSecret.codeUnits,
+              masterSecret: Uint8List.fromList(masterSecret.codeUnits),
               passphrase: passphrase,
               threshold: threshold);
 

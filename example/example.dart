@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:slip39/slip39.dart';
 
@@ -42,7 +43,7 @@ void main() {
 
   final slip = Slip39.from(
     json,
-    masterSecret: masterSecret.codeUnits,
+    masterSecret: Uint8List.fromList(masterSecret.codeUnits),
     passphrase: passphrase,
   );
 

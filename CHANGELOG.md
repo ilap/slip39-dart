@@ -37,3 +37,6 @@ v0.1.6-dev.4
 v0.2.0
 * Migrated to null-safety.
 * Use an own decodeBigInt and encodeBigInt as the pointycastle's started handling negative BigInts which is not implemented in SLIP-0039.
+
+v0.2.1
+* Removed pointycastle and HEX package dependencies.

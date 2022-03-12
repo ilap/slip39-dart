@@ -62,7 +62,6 @@ const _secretIndex = 255;
 int _bitsToBytes(n) => (n + 7) ~/ 8;
 int _bitsToWords(n) => (n + _radixBits - 1) ~/ _radixBits;
 
-final _derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
 final Random _random = Random.secure();
 
 ///
@@ -85,23 +84,21 @@ Uint8List _roundFunction(
   final roundedPhrase = Uint8List.fromList(round + passphrase);
   final count = (_iterationCount << exp) ~/ _roundCount;
 
-  _derivator..init(Pbkdf2Parameters(saltAndR, count, r.length));
-  final result = _derivator.process(roundedPhrase);
+  final result = PBKDF2.hmac_sha256(roundedPhrase, saltAndR, count, r.length);
 
   return result;
 }
 
-Uint8List _crypt(List masterSecret, String passphrase, int iterationExponent,
-    Uint8List identifier,
+Uint8List _crypt(Uint8List masterSecret, String passphrase,
+    int iterationExponent, Uint8List identifier,
     {bool encrypt = true}) {
   if (iterationExponent < 0 || iterationExponent > _maxIterationExponent) {
     throw Exception(
         'Invalid iteration exponent ($iterationExponent). Expected between 0 and $_maxIterationExponent');
   }
-  var IL = Uint8List.fromList(
-      masterSecret.sublist(0, masterSecret.length ~/ 2) as List<int>);
-  var IR = Uint8List.fromList(
-      masterSecret.sublist(masterSecret.length ~/ 2) as List<int>);
+
+  var IL = masterSecret.sublist(0, masterSecret.length ~/ 2);
+  var IR = masterSecret.sublist(masterSecret.length ~/ 2);
 
   final pwd = Uint8List.fromList(passphrase.codeUnits);
 
@@ -120,12 +117,10 @@ Uint8List _crypt(List masterSecret, String passphrase, int iterationExponent,
 }
 
 Uint8List _createDigest(Uint8List randomData, Uint8List sharedSecret) {
-  final mac = Mac('SHA-256/HMAC');
-  final keyParam = KeyParameter(randomData);
-  mac.init(keyParam);
-  final result = mac.process(sharedSecret);
+  final out = Uint8List(32);
+  TweetNaClExt.crypto_auth_hmacsha256(out, sharedSecret, randomData);
 
-  return Uint8List.fromList(result.sublist(0, 4));
+  return out.sublist(0, 4);
 }
 
 List _splitSecret(int threshold, int shareCount, Uint8List sharedSecret) {
@@ -538,7 +533,7 @@ Map _decodeMnemonic(String mnemonic) {
   }
 }
 
-var _byteMask = BigInt.from(0xff);
+final _byteMask = BigInt.from(0xff);
 final negativeFlag = BigInt.from(0x80);
 
 Uint8List _encodeBigInt(BigInt number) {
@@ -591,23 +586,23 @@ bool _listsAreEqual(List a, List b) {
 ///   Converts share data to a share mnemonic.
 ///
 String _encodeMnemonic(
-  identifier,
-  iterationExponent,
-  groupIndex,
-  groupThreshold,
-  groupCount,
-  memberIndex,
-  memberThreshold,
-  value,
+  Uint8List identifier,
+  int iterationExponent,
+  int groupIndex,
+  int groupThreshold,
+  int groupCount,
+  int memberIndex,
+  int memberThreshold,
+  Uint8List value,
 ) {
 // Convert the share value from bytes to wordlist indices.
   final valueWordCount = _bitsToWords(value.length * 8);
 
   BigInt valueInt = _decodeBigInt(value);
-  identifier = int.parse(HEX.encode(identifier), radix: 16);
+  final id = int.parse(HexCoder.instance.encode(identifier), radix: 16);
 
   final gp = _groupPrefix(
-      identifier, iterationExponent, groupIndex, groupThreshold, groupCount);
+      id, iterationExponent, groupIndex, groupThreshold, groupCount);
   final tp = //tuple(
       _intToIndices(valueInt, valueWordCount, _radixBits);
 
