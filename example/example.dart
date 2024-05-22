@@ -67,7 +67,9 @@ void main() {
   final allShares = familyShares..addAll(friendsShares);
 
   print("Shares used for restoring the master secret:");
-  allShares..forEach((s) => print(s));
+  for (var s in allShares) {
+    print(s);
+  }
 
   final recoveredSecret = String.fromCharCodes(
       Slip39.recoverSecret(allShares, passphrase: passphrase));

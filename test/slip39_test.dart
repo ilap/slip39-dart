@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:pinenacl/ed25519.dart';
 import 'package:test/test.dart';
@@ -53,7 +52,7 @@ void main() {
       var mnemonics = slip15.fromPath('r/0').mnemonics;
 
       var combinations = getCombinations([0, 1, 2, 3, 4, 5, 6], 5);
-      combinations.forEach((item) {
+      for (var item in combinations) {
         item.shuffle();
         var description = 'Test shuffled combination ${item.join(' ')}.';
         test(description, () {
@@ -62,7 +61,7 @@ void main() {
               String.fromCharCodes(
                   Slip39.recoverSecret(shares, passphrase: passphrase)));
         });
-      });
+      }
     });
 
     group('Test passhrase', () {
@@ -246,26 +245,26 @@ void main() {
   ];
 
   group('Mnemonic validation', () {
-    vectors.forEach((item) {
+    for (var item in vectors) {
       final mnemonics = List<String>.from(item[1] as Iterable<dynamic>);
       var index = 0;
       test('Mnemonic at index ${index++} should be invalid', () {
-        mnemonics.forEach((mnemonic) {
+        for (var mnemonic in mnemonics) {
           final isValid = Slip39.validateMnemonic(mnemonic);
           assert(!isValid);
-        });
+        }
       });
-    });
+    }
 
     var mnemonics = slip15.fromPath('r/0').mnemonics;
 
     var index = 0;
-    mnemonics.forEach((mnemonic) {
+    for (var mnemonic in mnemonics) {
       test('Mnemonic at index ${index++} should be valid', () {
         final isValid = Slip39.validateMnemonic(mnemonic);
         assert(isValid);
       });
-    });
+    }
   });
 
   group('Invalid Shares', () {
@@ -334,7 +333,7 @@ void main() {
       ]
     ];
 
-    tests.forEach((item) {
+    for (var item in tests) {
       var description = item[0];
       var threshold = item[1];
 
@@ -348,7 +347,7 @@ void main() {
                 threshold: threshold as int),
             throwsException);
       });
-    });
+    }
   });
   group("Groups test (T=1, N=1 e.g. [1,1]) - ", () {
     final totalGroups = 16;

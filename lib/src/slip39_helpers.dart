@@ -1,3 +1,5 @@
+// ignore_for_file: void_checks
+
 part of 'slip39.dart';
 
 ///
@@ -107,8 +109,8 @@ Uint8List _crypt(Uint8List masterSecret, String passphrase,
         'Invalid iteration exponent ($iterationExponent). Expected between 0 and $_maxIterationExponent');
   }
 
-  var IL = masterSecret.sublist(0, masterSecret.length ~/ 2);
-  var IR = masterSecret.sublist(masterSecret.length ~/ 2);
+  var iL = masterSecret.sublist(0, masterSecret.length ~/ 2);
+  var iR = masterSecret.sublist(masterSecret.length ~/ 2);
 
   final pwd = Uint8List.fromList(passphrase.codeUnits);
 
@@ -118,12 +120,12 @@ Uint8List _crypt(Uint8List masterSecret, String passphrase,
   range = encrypt ? range : range.reversed.toList();
 
   for (final i in range) {
-    final f = _roundFunction(i, pwd, iterationExponent, salt, IR);
-    final t = _xor(IL, f);
-    IL = IR;
-    IR = t;
+    final f = _roundFunction(i, pwd, iterationExponent, salt, iR);
+    final t = _xor(iL, f);
+    iL = iR;
+    iR = t;
   }
-  return Uint8List.fromList(IR + IL);
+  return Uint8List.fromList(iR + iL);
 }
 
 Uint8List _createDigest(Uint8List randomData, Uint8List sharedSecret) {
@@ -261,7 +263,7 @@ List<int> _interpolate(Map shares, int x) {
 }
 
 int _rs1024Polymod(values) {
-  const _gen = [
+  const gen = [
     0xE0E040,
     0x1C1C080,
     0x3838100,
@@ -281,7 +283,7 @@ int _rs1024Polymod(values) {
     chk = (chk & 0xFFFFF) << 10 ^ v;
     for (var i = 0; i < 10; i++) {
       final bb = ((b >> i) & 1);
-      final cc = bb != 0 ? _gen[i] : 0;
+      final cc = bb != 0 ? gen[i] : 0;
 
       chk ^= cc;
     }
@@ -435,7 +437,7 @@ Map _decodeMnemonics(List<String> mnemonics) {
   final groupCounts = <dynamic>{};
   final groups = {};
 
-  mnemonics.forEach((mnemonic) {
+  for (var mnemonic in mnemonics) {
     final decoded = _decodeMnemonic(mnemonic);
 
     identifiers.add(decoded['identifier']);
@@ -449,8 +451,8 @@ Map _decodeMnemonics(List<String> mnemonics) {
     final memberThreshold = decoded['memberThreshold'];
     final share = decoded['share'];
 
-    final group = groups[groupIndex] ?? Map();
-    final member = group[memberThreshold] ?? Map();
+    final group = groups[groupIndex] ?? {};
+    final member = group[memberThreshold] ?? {};
     member[memberIndex] = share;
     group[memberThreshold] = member;
     if (group.keys.length != 1) {
@@ -458,7 +460,7 @@ Map _decodeMnemonics(List<String> mnemonics) {
           'Invalid set of mnemonics. All mnemonics in a group must have the same member threshold.');
     }
     groups[groupIndex] = group;
-  });
+  }
 
   if (identifiers.length != 1 ||
       iterationExponents.length != 1 ||
@@ -572,7 +574,7 @@ final negativeFlag = BigInt.from(0x80);
 Uint8List _encodeBigInt(BigInt number) {
   // Not handling negative numbers.
   int size = (number.bitLength + 7) >> 3;
-  var result = new Uint8List(size);
+  var result = Uint8List(size);
   for (int i = 0; i < size; i++) {
     result[size - i - 1] = (number & _byteMask).toInt();
     number = number >> 8;
@@ -601,9 +603,7 @@ List<int> _groupPrefix(identifier, iterationExponent, extendableBackupFlag,
   final indc2 =
       (groupIndex << 6) + ((groupThreshold - 1) << 2) + ((groupCount - 1) >> 2);
 
-  return <int>[]
-    ..addAll(indc)
-    ..add(indc2);
+  return <int>[...indc, indc2];
 }
 
 bool _listsAreEqual(List a, List b) {
@@ -646,20 +646,17 @@ String _encodeMnemonic(
       (memberIndex << 4) +
       (memberThreshold - 1);
 
-  final shareData = <int>[]
-    ..addAll(gp)
-    ..add(calc)
-    ..addAll(tp);
+  final shareData = <int>[...gp, calc, ...tp];
   final checksum = _rs1024CreateChecksum(shareData, extendableBackupFlag);
 
   return _mnemonicFromIndices(shareData + checksum);
 }
 
 BigInt _decodeBigInt(List<int> bytes) {
-  BigInt result = new BigInt.from(0);
+  BigInt result = BigInt.from(0);
 
   for (int i = 0; i < bytes.length; i++) {
-    result += new BigInt.from(bytes[bytes.length - i - 1]) << (8 * i);
+    result += BigInt.from(bytes[bytes.length - i - 1]) << (8 * i);
   }
   return result;
 }

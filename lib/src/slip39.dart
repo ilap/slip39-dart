@@ -1,5 +1,4 @@
 import 'dart:core';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:pinenacl/api.dart';
@@ -148,11 +147,11 @@ class Slip39 {
     var children = [];
     final secretShares = _splitSecret(current._threshold, nodes.length, secret);
     var idx = 0;
-    nodes.forEach((item) {
-      var name;
-      var threshold;
-      var shares;
-      var node;
+    for (var item in nodes) {
+      String name;
+      int threshold;
+      List shares;
+      Slip39Node node;
 
       if (item is Map) {
         name = item['name'];
@@ -184,9 +183,9 @@ class Slip39 {
           secret: Uint8List.fromList(secretShares[idx]),
           index: current._index,
           depth: depth);
-      children..add(branch);
+      children.add(branch);
       idx++;
-    });
+    }
     return current._copyWith(children: List.unmodifiable(children));
   }
 
@@ -234,7 +233,7 @@ class Slip39 {
           'The requested group threshold ($threshold) must not exceed the number of groups (${groups.length}).');
     }
 
-    groups.forEach((item) {
+    for (var item in groups) {
       // Assume it's malformed.
       var throwNeeded = true;
       if (item is List) {
@@ -246,7 +245,7 @@ class Slip39 {
         throw Exception(
             'Creating multiple member shares with member threshold 1 is not allowed. Use 1-of-1 member sharing instead. $groups');
       }
-    });
+    }
   }
 
   Iterable<int> _parseChildren(String path) {

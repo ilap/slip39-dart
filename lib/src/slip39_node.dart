@@ -35,10 +35,10 @@ class Slip39Node {
       List<Slip39Node>? children}) {
     return Slip39Node(
         name: name ?? this.name,
-        mnemonic: mnemonic ?? this._mnemonic,
-        threshold: threshold ?? this._threshold,
-        index: index ?? this._index,
-        children: children ?? this._children);
+        mnemonic: mnemonic ?? _mnemonic,
+        threshold: threshold ?? _threshold,
+        index: index ?? _index,
+        children: children ?? _children);
   }
 
   Map<String, Object?> toJson() {
