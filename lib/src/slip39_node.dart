@@ -4,7 +4,12 @@ part of 'slip39.dart';
 /// Slip39Node
 ///
 class Slip39Node {
-  Slip39Node({required this.name, String mnemonic = "", int index = 0, int threshold = 1, List<Slip39Node> children = const <Slip39Node>[]})
+  Slip39Node(
+      {required this.name,
+      String mnemonic = "",
+      int index = 0,
+      int threshold = 1,
+      List<Slip39Node> children = const <Slip39Node>[]})
       : _mnemonic = mnemonic,
         _index = index,
         _threshold = threshold,

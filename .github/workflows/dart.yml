@@ -17,6 +17,10 @@ jobs:
       - uses: dart-lang/setup-dart@v1
       - name: Install dependencies
         run: dart pub get
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Run Analyzer
+        run: dart analyze
       - name: Run tests
         run: dart test
       - name: Publish
