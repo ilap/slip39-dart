@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 
-
 import 'package:pinenacl/ed25519.dart';
 import 'package:test/test.dart';
 
@@ -116,11 +115,13 @@ void main() {
           () {
         expect(
             () => Slip39.from(oneOfOne,
-                masterSecret: Uint8List.fromList(masterSecret.codeUnits), iterationExponent: -1),
+                masterSecret: Uint8List.fromList(masterSecret.codeUnits),
+                iterationExponent: -1),
             throwsException);
         expect(
             () => Slip39.from(oneOfOne,
-                masterSecret: Uint8List.fromList(masterSecret.codeUnits), iterationExponent: 33),
+                masterSecret: Uint8List.fromList(masterSecret.codeUnits),
+                iterationExponent: 33),
             throwsException);
       });
     });
@@ -180,7 +181,7 @@ void main() {
         if (ms!.isNotEmpty) {
           List<int> result =
               Slip39.recoverSecret(mnemonics, passphrase: passphrase);
-          assert(ms == HexCoder.instance.encode(result));
+          assert(ms == Base16Encoder.instance.encode(result));
         } else {
           expect(() => Slip39.recoverSecret(mnemonics, passphrase: passphrase),
               throwsException);
@@ -353,21 +354,25 @@ void main() {
     final totalGroups = 16;
     final groups = List<List<int>>.generate(totalGroups, (_) => [1, 1]);
 
-    for (int group = 1; group <= totalGroups; group++) {
-      for (int threshold = 1; threshold <= group; threshold++) {
-        test(
-            "recover master secret for $threshold shares (threshold=$threshold) of $group '[1, 1,]' groups",
-            () {
-          final slip = Slip39.from(groups.sublist(0, group),
-              masterSecret: Uint8List.fromList(masterSecret.codeUnits),
-              passphrase: passphrase,
-              threshold: threshold);
+    for (int extFlag = 0; extFlag < 2; extFlag++) {
+      for (int group = 1; group <= totalGroups; group++) {
+        for (int threshold = 1; threshold <= group; threshold++) {
+          test(
+              "recover master secret for $threshold shares (threshold=$threshold) of $group '[1, 1,]'groups  with extendable backup flag set to $extFlag",
+              () {
+            final slip = Slip39.from(groups.sublist(0, group),
+                masterSecret: Uint8List.fromList(masterSecret.codeUnits),
+                passphrase: passphrase,
+                threshold: threshold,
+                extendableBackupFlag: extFlag);
 
-          final mnemonics = slip.fromPath('r').mnemonics.sublist(0, threshold);
-          final recoveredSecret =
-              Slip39.recoverSecret(mnemonics, passphrase: passphrase);
-          assert(masterSecret == String.fromCharCodes(recoveredSecret));
-        });
+            final mnemonics =
+                slip.fromPath('r').mnemonics.sublist(0, threshold);
+            final recoveredSecret =
+                Slip39.recoverSecret(mnemonics, passphrase: passphrase);
+            assert(masterSecret == String.fromCharCodes(recoveredSecret));
+          });
+        }
       }
     }
   });

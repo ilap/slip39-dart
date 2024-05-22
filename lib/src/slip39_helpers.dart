@@ -11,12 +11,19 @@ const _radixBits = 10;
 const _identifierBitsLength = 15;
 
 // The length of the iteration exponent in bits.
-const _iterationExponentBitsLength = 5;
+const _iterationExponentBitsLength = 4;
 
-// The length of the random identifier and iteration exponent in words.
-const _identifierExpWordsLength =
-    (_identifierBitsLength + _iterationExponentBitsLength + _radixBits - 1) ~/
-        _radixBits;
+// The length of the extendable backup flag in bits.
+const _extendableBackupFlagBitsLength = 1;
+
+// The length of the random identifier, extendable backup flag and iteration exponent in words.
+const _identifierExpWordsLength = (_identifierBitsLength +
+        _iterationExponentBitsLength +
+        _extendableBackupFlagBitsLength +
+        _radixBits -
+        1) ~/
+    _radixBits;
+
 // The maximum iteration exponent
 final _maxIterationExponent = pow(2, _iterationExponentBitsLength);
 
@@ -31,6 +38,9 @@ const _digestLength = 4;
 
 // The customization string used in the RS1024 checksum and in the PBKDF2 salt.
 const _saltString = 'shamir';
+
+// The customization string used in RS1024 checksum when the extendable backup flag is set.
+const _saltStringExtendable = 'shamir_extendable';
 
 // The minimum allowed entropy of the master secret.
 const _minEntropyBits = 128;
@@ -70,7 +80,7 @@ final Random _random = Random.secure();
 ///
 List<int> _randomBytes([int length = 32]) {
   //FIXME: use the following only for testing.
-  //return List<int>.generate(length, (_) => 0x12);
+  // return List<int>.generate(length, (_) => 0x12);
   return List<int>.generate(length, (_) => _random.nextInt(256));
 }
 
@@ -90,7 +100,7 @@ Uint8List _roundFunction(
 }
 
 Uint8List _crypt(Uint8List masterSecret, String passphrase,
-    int iterationExponent, Uint8List identifier,
+    int iterationExponent, int extendableBackupFlag, Uint8List identifier,
     {bool encrypt = true}) {
   if (iterationExponent < 0 || iterationExponent > _maxIterationExponent) {
     throw Exception(
@@ -102,7 +112,7 @@ Uint8List _crypt(Uint8List masterSecret, String passphrase,
 
   final pwd = Uint8List.fromList(passphrase.codeUnits);
 
-  final salt = _getSalt(identifier);
+  final salt = _getSalt(identifier, extendableBackupFlag);
 
   var range = List.generate(_roundCount, (i) => i);
   range = encrypt ? range : range.reversed.toList();
@@ -185,9 +195,13 @@ Uint8List _xor(Uint8List a, Uint8List b) {
   return Uint8List.fromList(List.generate(a.length, (i) => a[i] ^ b[i]));
 }
 
-Uint8List _getSalt(Uint8List identifier) {
-  final salt = Uint8List.fromList(_saltString.codeUnits);
-  return Uint8List.fromList(salt + identifier);
+Uint8List _getSalt(Uint8List identifier, int extendableBackupFlag) {
+  if (extendableBackupFlag == 1) {
+    return Uint8List.fromList([]);
+  } else {
+    final salt = Uint8List.fromList(_saltString.codeUnits);
+    return Uint8List.fromList(salt + identifier);
+  }
 }
 
 List<int> _interpolate(Map shares, int x) {
@@ -275,9 +289,13 @@ int _rs1024Polymod(values) {
   return chk;
 }
 
-List<int> _rs1024CreateChecksum(List<int> data) {
-  final values =
-      _saltString.codeUnits + data + List<int>.filled(_checksumWordsLength, 0);
+String _salt(extendableBackupFlag) =>
+    extendableBackupFlag == 1 ? _saltStringExtendable : _saltString;
+
+List<int> _rs1024CreateChecksum(List<int> data, int extendableBackupFlag) {
+  final values = _salt(extendableBackupFlag).codeUnits +
+      data +
+      List<int>.filled(_checksumWordsLength, 0);
 
   int polymod = _rs1024Polymod(values) ^ 1;
   final result =
@@ -285,8 +303,8 @@ List<int> _rs1024CreateChecksum(List<int> data) {
   return result.reversed.toList();
 }
 
-bool _rs1024VerifyChecksum(data) {
-  return _rs1024Polymod(_saltString.codeUnits + data) == 1;
+bool _rs1024VerifyChecksum(data, extendableBackupFlag) {
+  return _rs1024Polymod(_salt(extendableBackupFlag).codeUnits + data) == 1;
 }
 
 ///
@@ -364,6 +382,7 @@ List<int> _combineMnemonics(List<String> mnemonics, {String passphrase = ''}) {
   final decoded = _decodeMnemonics(mnemonics);
   final identifier = decoded['identifiers'];
   final iterationExponent = decoded['iterationExponents'];
+  final extendableBackupFlag = decoded['extendableBackupFlag'];
   final groupThreshold = decoded['groupThresholds'];
   final groupCount = decoded['groupCounts'];
   final groups = decoded['groups'];
@@ -386,6 +405,7 @@ List<int> _combineMnemonics(List<String> mnemonics, {String passphrase = ''}) {
       final prefix = _groupPrefix(
         identifier,
         iterationExponent,
+        extendableBackupFlag,
         groupIndex,
         groupThreshold,
         groupCount,
@@ -401,15 +421,18 @@ List<int> _combineMnemonics(List<String> mnemonics, {String passphrase = ''}) {
   final ems = _recoverSecret(groupThreshold, allShares);
   final id = Uint8List.fromList(
       _intToIndices(BigInt.from(identifier), _identifierExpWordsLength, 8));
-  final ms = _crypt(ems, passphrase, iterationExponent, id, encrypt: false);
+  final ms = _crypt(
+      ems, passphrase, iterationExponent, extendableBackupFlag, id,
+      encrypt: false);
   return ms;
 }
 
 Map _decodeMnemonics(List<String> mnemonics) {
-  final identifiers = Set();
-  final iterationExponents = Set();
-  final groupThresholds = Set();
-  final groupCounts = Set();
+  final identifiers = <dynamic>{};
+  final iterationExponents = <dynamic>{};
+  final extendableBackupFlags = <dynamic>{};
+  final groupThresholds = <dynamic>{};
+  final groupCounts = <dynamic>{};
   final groups = {};
 
   mnemonics.forEach((mnemonic) {
@@ -417,6 +440,8 @@ Map _decodeMnemonics(List<String> mnemonics) {
 
     identifiers.add(decoded['identifier']);
     iterationExponents.add(decoded['iterationExponent']);
+    extendableBackupFlags.add(decoded['extendableBackupFlag']);
+
     final groupIndex = decoded['groupIndex'];
     groupThresholds.add(decoded['groupThreshold']);
     groupCounts.add(decoded['groupCount']);
@@ -435,7 +460,9 @@ Map _decodeMnemonics(List<String> mnemonics) {
     groups[groupIndex] = group;
   });
 
-  if (identifiers.length != 1 || iterationExponents.length != 1) {
+  if (identifiers.length != 1 ||
+      iterationExponents.length != 1 ||
+      extendableBackupFlags.length != 1) {
     throw Exception(
         'Invalid set of mnemonics. All mnemonics must begin with the same ($_identifierExpWordsLength) words.');
   }
@@ -453,6 +480,7 @@ Map _decodeMnemonics(List<String> mnemonics) {
   return {
     'identifiers': identifiers.first,
     'iterationExponents': iterationExponents.first,
+    'extendableBackupFlag': extendableBackupFlags.first,
     'groupThresholds': groupThresholds.first,
     'groupCounts': groupCounts.first,
     'groups': groups,
@@ -475,15 +503,19 @@ Map _decodeMnemonic(String mnemonic) {
     throw Exception('Invalid mnemonic length.');
   }
 
-  if (!_rs1024VerifyChecksum(data)) {
+  final idExpInt =
+      _intFromIndices(data.sublist(0, _identifierExpWordsLength)).toInt();
+  final identifier = idExpInt >>
+      (_iterationExponentBitsLength + _extendableBackupFlagBitsLength);
+  final iterationExponent =
+      idExpInt & ((1 << _iterationExponentBitsLength) - 1);
+  final extendableBackupFlag = (idExpInt >> _iterationExponentBitsLength) &
+      ((1 << _extendableBackupFlagBitsLength) - 1);
+
+  if (!_rs1024VerifyChecksum(data, extendableBackupFlag)) {
     throw Exception('Invalid mnemonic checksum');
   }
 
-  final idExpInt =
-      _intFromIndices(data.sublist(0, _identifierExpWordsLength)).toInt();
-  final identifier = idExpInt >> _iterationExponentBitsLength;
-  final iterationExponent =
-      idExpInt & ((1 << _iterationExponentBitsLength) - 1);
   final tmp = _intFromIndices(
       data.sublist(_identifierExpWordsLength, _identifierExpWordsLength + 2));
 
@@ -521,6 +553,7 @@ Map _decodeMnemonic(String mnemonic) {
     return {
       'identifier': identifier,
       'iterationExponent': iterationExponent,
+      'extendableBackupFlag': extendableBackupFlag,
       'groupIndex': groupIndex,
       'groupThreshold': groupThreshold + 1,
       'groupCount': groupCount + 1,
@@ -556,12 +589,14 @@ bool _validateMnemonic(String mnemonic) {
   }
 }
 
-List<int> _groupPrefix(
-    identifier, iterationExponent, groupIndex, groupThreshold, groupCount) {
-  final id_exp_int = BigInt.from(
-      (identifier << _iterationExponentBitsLength) + iterationExponent);
+List<int> _groupPrefix(identifier, iterationExponent, extendableBackupFlag,
+    groupIndex, groupThreshold, groupCount) {
+  final idExpInt = BigInt.from((identifier <<
+          (_iterationExponentBitsLength + _extendableBackupFlagBitsLength)) +
+      (extendableBackupFlag << _iterationExponentBitsLength) +
+      iterationExponent);
 
-  final indc = _intToIndices(id_exp_int, _identifierExpWordsLength, _radixBits);
+  final indc = _intToIndices(idExpInt, _identifierExpWordsLength, _radixBits);
 
   final indc2 =
       (groupIndex << 6) + ((groupThreshold - 1) << 2) + ((groupCount - 1) >> 2);
@@ -588,6 +623,7 @@ bool _listsAreEqual(List a, List b) {
 String _encodeMnemonic(
   Uint8List identifier,
   int iterationExponent,
+  int extendableBackupFlag,
   int groupIndex,
   int groupThreshold,
   int groupCount,
@@ -599,10 +635,10 @@ String _encodeMnemonic(
   final valueWordCount = _bitsToWords(value.length * 8);
 
   BigInt valueInt = _decodeBigInt(value);
-  final id = int.parse(HexCoder.instance.encode(identifier), radix: 16);
+  final id = int.parse(Base16Encoder.instance.encode(identifier), radix: 16);
 
-  final gp = _groupPrefix(
-      id, iterationExponent, groupIndex, groupThreshold, groupCount);
+  final gp = _groupPrefix(id, iterationExponent, extendableBackupFlag,
+      groupIndex, groupThreshold, groupCount);
   final tp = //tuple(
       _intToIndices(valueInt, valueWordCount, _radixBits);
 
@@ -614,7 +650,7 @@ String _encodeMnemonic(
     ..addAll(gp)
     ..add(calc)
     ..addAll(tp);
-  final checksum = _rs1024CreateChecksum(shareData);
+  final checksum = _rs1024CreateChecksum(shareData, extendableBackupFlag);
 
   return _mnemonicFromIndices(shareData + checksum);
 }

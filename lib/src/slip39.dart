@@ -1,15 +1,12 @@
 import 'dart:core';
+import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:pinenacl/api.dart';
 import 'package:pinenacl/encoding.dart';
 
 import 'package:pinenacl/key_derivation.dart';
 import 'package:pinenacl/tweetnacl.dart';
-
-//import 'package:hex/hex.dart';
-
 
 part 'slip39_helpers.dart';
 part 'slip39_node.dart';
@@ -21,15 +18,13 @@ class Slip39 {
   // Private constructor
   Slip39._(
       {Slip39Node? root,
-      int groupCount = 0,
-      int groupThreshold = 0,
-      int iterationExponent = 0,
+      this.groupCount = 0,
+      this.groupThreshold = 0,
+      this.iterationExponent = 0,
+      this.extendableBackupFlag = 0,
       Uint8List? identifier})
-      : this._root = root,
-        this.groupCount = groupCount,
-        this.groupThreshold = groupThreshold,
-        this.iterationExponent = iterationExponent,
-        this.identifier = identifier ?? _generateIdentifier();
+      : _root = root,
+        identifier = identifier ?? _generateIdentifier();
 
   factory Slip39.from(
     dynamic data, {
@@ -37,6 +32,7 @@ class Slip39 {
     String passphrase = '',
     int threshold = 0,
     int iterationExponent = 0,
+    int extendableBackupFlag = 0,
   }) {
     final name = data is Map ? data['name'] : 'All Shares';
     try {
@@ -54,11 +50,12 @@ class Slip39 {
         groups: groups);
 
     final identifier = _generateIdentifier();
-    final encryptedMasterSecret =
-        _crypt(masterSecret, passphrase, iterationExponent, identifier);
+    final encryptedMasterSecret = _crypt(masterSecret, passphrase,
+        iterationExponent, extendableBackupFlag, identifier);
 
     final slip = Slip39._(
         iterationExponent: iterationExponent,
+        extendableBackupFlag: extendableBackupFlag,
         identifier: identifier,
         groupCount: groups.length,
         groupThreshold: threshold);
@@ -80,6 +77,7 @@ class Slip39 {
   // Random identifier
   final Uint8List identifier;
   final int iterationExponent;
+  final int extendableBackupFlag;
 
   ///
   /// Methods
@@ -87,10 +85,11 @@ class Slip39 {
   Slip39 copyWith({required Slip39Node root}) {
     return Slip39._(
       root: root,
-      iterationExponent: this.iterationExponent,
-      identifier: this.identifier,
-      groupCount: this.groupCount,
-      groupThreshold: this.groupThreshold,
+      iterationExponent: iterationExponent,
+      extendableBackupFlag: extendableBackupFlag,
+      identifier: identifier,
+      groupCount: groupCount,
+      groupThreshold: groupThreshold,
     );
   }
 
@@ -135,6 +134,7 @@ class Slip39 {
       final mnemonic = _encodeMnemonic(
           identifier,
           iterationExponent,
+          extendableBackupFlag,
           index,
           groupThreshold,
           groupCount,
@@ -146,8 +146,7 @@ class Slip39 {
     }
 
     var children = [];
-    final secretShares =
-        _splitSecret(current._threshold, nodes.length, secret);
+    final secretShares = _splitSecret(current._threshold, nodes.length, secret);
     var idx = 0;
     nodes.forEach((item) {
       var name;
