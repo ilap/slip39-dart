@@ -1,27 +1,53 @@
-# .github/workflows/publish.yml
-name: Publish to pub.dev
+name: Dart
 
 on:
-  push:
-    tags:
-    - 'v[0-9]+.[0-9]+.[0-9]+*' # tag pattern on pub.dev: 'v{{version}'
+  [push, pull_request]
 
-# Publish using custom workflow
 jobs:
-  publish:
-    permissions:
-      id-token: write # Required for authentication using OIDC
-    runs-on: ubuntu-latest
+
+  # Default test configurations.
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        sdk: [stable, beta, dev]
+        architecture: [x64, arm, arm64]
+      fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
-      - name: Install dependencies
-        run: dart pub get
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed .
-      - name: Run Analyzer
-        run: dart analyze
-      - name: Run tests
-        run: dart test
-      - name: Publish
-        run: dart pub publish --force
+        with:
+          sdk: ${{ matrix.sdk }}
+      - name: Print DART_HOME
+        run: echo "Dart SDK installed in $DART_HOME"
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart run example/main.dart
+      - run: dart run example/example.dart
+      - run: dart analyze
+      - run: dart test
+
+
+  # Default test configurations.
+  test_32bit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        sdk: [stable]
+        architecture: [ia32, arm]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+      - name: Print DART_HOME
+        run: echo "Dart SDK installed in $DART_HOME"
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart run example/main.dart
+      - run: dart run example/example.dart
+      - run: dart analyze
+      - run: dart test
