@@ -81,8 +81,6 @@ final Random _random = Random.secure();
 /// - [Check this](https://www.scottbrady91.com/Dart/Generating-a-Crypto-Random-String-in-Dart)
 ///
 List<int> _randomBytes([int length = 32]) {
-  //FIXME: use the following only for testing.
-  // return List<int>.generate(length, (_) => 0x12);
   return List<int>.generate(length, (_) => _random.nextInt(256));
 }
 
@@ -216,11 +214,7 @@ List<int> _interpolate(Map shares, int x) {
   }
 
   if (xCoord.contains(x)) {
-    shares.forEach((k, v) {
-      if (k == x) {
-        return v;
-      }
-    });
+    return shares[x];
   }
 
   // Logarithm of the product of (x_i - x) for i = 1, ... , k.

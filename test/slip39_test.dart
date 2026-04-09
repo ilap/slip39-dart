@@ -172,9 +172,6 @@ void main() {
       String? description = item[0];
       final mnemonics = List<String>.from(item[1]);
       String? ms = item[2];
-      if (item[0].toString().startsWith("17.")) {
-        print("TEST:");
-      }
 
       test(description, () {
         if (ms!.isNotEmpty) {
